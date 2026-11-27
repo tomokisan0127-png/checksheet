@@ -178,6 +178,26 @@ table.pv td[style*="white-space:pre;"]{overflow:visible}
 .lib .row{border-top:0;flex:1}.lib.cur{background:var(--lo-bg)}
 .lib .t b{font-size:16px}
 header .sw{display:flex;align-items:center;gap:4px;color:var(--pri);padding:0 10px;font-size:15px}
+.ordbtn{min-height:36px;margin-left:8px;color:var(--pri);border-color:var(--pri)}
+.grp span:last-child{display:flex;align-items:center}
+.selbar{position:sticky;top:62px;z-index:4;display:flex;flex-wrap:wrap;gap:6px;align-items:center;background:var(--paper);border:1.5px solid var(--pri);border-radius:12px;padding:8px;margin-bottom:10px;box-shadow:var(--shadow)}
+.selbar .cnt{flex:1 1 100%;font-size:14px}.selbar .cnt b{color:var(--pri);font-size:19px}
+.selbar button{flex:1 1 auto}
+.items.selmode .card{grid-template-columns:30px 40px 1fr}
+.items.selmode .card .ck{grid-row:span 3;width:26px;height:26px;border:2px solid var(--line);border-radius:7px;display:grid;place-items:center;font-weight:700;color:#fff;align-self:start}
+.items.selmode .card>:not(.ck):not(.n){grid-column:3}
+.items.selmode .card.sel{border-color:var(--pri);box-shadow:0 0 0 2px rgb(26 86 181/.25);background:var(--lo-bg)}
+.items.selmode .card.sel .ck{background:var(--pri);border-color:var(--pri)}
+.xsel{width:100%;min-height:50px;border:1.5px solid var(--line);border-radius:10px;padding:0 10px;background:var(--paper);font-size:16px}
+.ord{display:flex;align-items:center;gap:10px;background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:8px 6px 8px 12px;margin:8px 0;box-shadow:var(--shadow);touch-action:pan-y}
+.ord .t{flex:1;font-size:15px;font-weight:700;line-height:1.4}.ord .t small{display:block;font-weight:400;color:var(--sub);font-size:12px}
+.ord .no{min-width:40px;text-align:center;font-weight:700;font-size:17px;font-variant-numeric:tabular-nums;line-height:1.3}.ord .no small{display:block;font-size:11px;color:var(--sub);font-weight:400}
+.ord.mv{border-color:var(--md-bd);background:var(--md-bg)}
+.ord.fixed{background:var(--tint);box-shadow:none}
+.ord .ordb{display:flex;flex-direction:column;gap:2px}.ord .ordb button{min-height:34px;width:40px;font-size:13px}
+.ord .hdl{width:44px;min-height:56px;display:grid;place-items:center;font-size:26px;color:var(--sub);cursor:grab;touch-action:none;user-select:none;border-left:1px solid var(--line)}
+.ord.drag{position:fixed;z-index:50;box-shadow:0 8px 24px rgb(0 0 0/.25);opacity:.95;margin:0}
+.ordph{border:2px dashed var(--pri);border-radius:12px;margin:8px 0;background:var(--lo-bg)}
 .card.flash{outline:3px solid var(--pri);outline-offset:2px}
 .err{color:var(--hi-tx);background:var(--hi-bg);border-radius:10px;padding:10px 12px;font-size:14px}
 </style>
@@ -440,7 +460,7 @@ class Book {
       const v = mk(sh.doc, 'v'); v.appendChild(sh.doc.createTextNode(s)); cell.appendChild(v); return;
     }
     if (this.sstDoc) { // Excel と同じ共有文字列で書く（インライン文字列は一部のアプリで表示されないため）
-      const idx = this._sstAdd(s, prevSi);
+      const idx = opt.siIdx != null && this.sst[opt.siIdx] === s ? opt.siIdx : this._sstAdd(s, prevSi);
       cell.setAttribute('t', 's'); const v = mk(sh.doc, 'v'); v.appendChild(sh.doc.createTextNode(String(idx))); cell.appendChild(v); return;
     }
     cell.setAttribute('t', 'inlineStr');
@@ -648,6 +668,18 @@ class Book {
     for (const f of all(sh.sd, 'f')) { const t = txt(f); const nt = mapRefs(t, (s, ref, pre) => s === src.name ? quoteName(newName) + '!' + ref : undefined); if (nt !== t) f.textContent = nt; }
     this._fixBookViews();
     return sh;
+  }
+  // シートの並び（タブの順番）を入れ替える。印刷範囲など localSheetId 付きの名前も付け替える
+  reorderSheets(order) {
+    if (order.length !== this.sheets.length || order.some(s => !this.sheets.includes(s))) throw new Error('シートの並びが正しくありません');
+    const oldIdx = new Map(this.sheets.map((s, i) => [s, i]));
+    const map = {}; order.forEach((s, i) => { map[oldIdx.get(s)] = i; });
+    const sheetsEl = kid(this.wb.documentElement, 'sheets');
+    for (const s of order) sheetsEl.appendChild(s.el);
+    const dn = kid(this.wb.documentElement, 'definedNames');
+    if (dn) for (const d of kids(dn, 'definedName')) { const lid = d.getAttribute('localSheetId'); if (lid != null && map[+lid] != null) d.setAttribute('localSheetId', map[+lid]); }
+    this.sheets.splice(0, this.sheets.length, ...order);
+    this._fixBookViews(); this.touch(this.wbPath);
   }
   deleteSheet(sh) {
     const idx = this.sheets.indexOf(sh);
@@ -942,7 +974,7 @@ class CheckBook {
     }
     if (C.work) { const w = prev ? b.val(sh, prev.r1, C.work) : (p.items[0] ? b.val(sh, p.items[0].r1, C.work) : ''); if (w && !b.val(sh, r, C.work)) b.set(sh, r, C.work, w, { keepNum: false }); }
     const it = { r1: r, r2: r };
-    if (C.no) b.set(sh, r, C.no, 0);
+    if (C.no) { const f0 = after < 0 && p.items[0] ? parseFloat(b.val(sh, p.items[0].r1 + (r <= p.items[0].r1 ? 1 : 0), C.no)) : NaN; b.set(sh, r, C.no, f0 > 0 ? f0 : 0); }
     this.writeItem(p, it, data, '追加');
     this.reanalyze(); this.renumber(this._samePage(p));
     return this._samePage(p);
@@ -957,8 +989,11 @@ class CheckBook {
     const n = it.r2 - it.r1 + 1;
     // 工程名が消える場合は次の行に引き継ぐ
     if (p.cols.proc) { const g = b.mergeAt(sh, it.r1, p.cols.proc); if (g && g.r1 === it.r1 && g.r2 > it.r2) { const v = b.val(sh, g.r1, p.cols.proc); b.set(sh, it.r2 + 1, p.cols.proc, v, { keepNum: false }); } }
+    const C = p.cols; const firstNo = idx === 0 && C.no && p.items.length > 1 ? parseFloat(b.val(sh, it.r1, C.no)) : NaN;
     b.shiftRows(sh, it.r1, -n);
-    this.reanalyze(); const np = this._samePage(p); this.renumber(np); return np;
+    this.reanalyze(); const np = this._samePage(p);
+    if (firstNo > 0 && np && np.items[0] && !b.info(sh, np.items[0].r1, C.no).f && !isNaN(parseFloat(b.val(sh, np.items[0].r1, C.no)))) b.set(sh, np.items[0].r1, C.no, firstNo);
+    this.renumber(np); return np;
   }
   moveItem(p, idx, d) {
     const j = idx + d; if (j < 0 || j >= p.items.length) return p;
@@ -1097,6 +1132,39 @@ class CheckBook {
     this.analyze(); this.recountTotals();
   }
 
+  // そのシートのすぐ後ろにある、ページ番号のない別紙（例：パネルSA①②）。並べ替えのとき一緒に動かす
+  attachedSheets(sh) {
+    const b = this.b; const out = []; const numbered = s => (s.pages || []).some(p => p.pn && this.pageNo(p));
+    for (let i = b.sheets.indexOf(sh) + 1; i < b.sheets.length; i++) { const s = b.sheets[i]; if (s.chart || numbered(s) || this.isCover(s) || this.isToc(s) || /改訂履歴|記入例/.test(s.name)) break; out.push(s); }
+    return out;
+  }
+  // ページの順番を入れ替える（同じ表紙のまとまりの中）。units: シートごとのページの配列を、新しい順番で
+  // ・シートのタブの順番 ・目次の並び（ページ番号） ・直接書かれたページ番号 をそろえる
+  reorderGroup(units) {
+    const b = this.b; const pages = units.flat();
+    const oldNo = new Map(pages.map(p => [p, +this.pageNo(p)]));
+    const nums = pages.map(p => oldNo.get(p)).filter(n => n).sort((x, y) => x - y);
+    if (nums.length !== pages.length) throw new Error('ページ番号のないページは並べ替えできません');
+    // 目次：元の番号の行に、新しい順番のページの中身（番号の列以外）を入れ直す
+    const tocs = [...new Set(pages.map(p => p.toc).filter(Boolean))];
+    for (const toc of tocs) {
+      const tsh = b.sheet(toc); if (!tsh) continue; const ents = this.tocEntries(toc);
+      const tp = pages.filter(p => p.toc === toc); const rows = tp.map(p => ents.find(e => e.no === oldNo.get(p))); if (rows.some(e => !e)) continue;
+      let maxC = 2; for (const e of rows) { const row = b.rows(tsh).get(e.r); if (row) for (const c of kids(row, 'c')) maxC = Math.max(maxC, pRef(c.getAttribute('r')).c); }
+      const vals = new Map(tp.map((p, i) => { const r = rows[i].r; const o = {}; for (let c = 1; c <= maxC; c++) if (c !== 2) { const inf = b.info(tsh, r, c); if (!inf.f) o[c] = inf.raw; } return [p, o]; }));
+      const sortedRows = rows.map(e => e.r).sort((x, y) => x - y);
+      const newTp = pages.filter(p => p.toc === toc);
+      newTp.forEach((p, i) => { const r = sortedRows[i]; const o = vals.get(p); for (const c in o) { const inf = b.info(tsh, r, +c); if (inf.f) continue; if (String(inf.raw) !== String(o[c])) b.set(tsh, r, +c, o[c] === '' ? '' : (typeof o[c] === 'number' ? o[c] : String(o[c])), { keepNum: true }); } });
+    }
+    // 直接書かれたページ番号
+    pages.forEach((p, i) => { if (p.pn && !p.pnFormula) { const v = b.val(p.sheet, p.pn.r, p.pn.c); if (+v !== nums[i]) b.set(p.sheet, p.pn.r, p.pn.c, nums[i]); } });
+    // シートのタブの順番：まとまりのシートが今いる位置に、新しい順番で入れ直す
+    const blocks = units.map(u => [u[0].sheet, ...this.attachedSheets(u[0].sheet)]); const shs = blocks.flat();
+    const pos = shs.map(s => b.sheets.indexOf(s)).sort((x, y) => x - y);
+    const order = b.sheets.slice(); pos.forEach((at, i) => { order[at] = shs[i]; });
+    b.reorderSheets(order);
+    this.analyze();
+  }
   // 総ページ数を数え直して表紙の「/21」を更新（目次があれば目次の件数、なければ表紙＋そのページ数）
   totals() {
     const o = {};
@@ -1236,6 +1304,9 @@ function apply(op, replay) {
     case 'addPage': res = cb.addPage(p, op.v, op.mode, op.pos ? pageByKey(op.pos) : null); break;
     case 'addTable': res = cb.createTablePage(p, pageByKey(op.pos), op.v, op.headers, op.rows); break;
     case 'delPage': cb.deletePage(p); break;
+    case 'order': applyOrder(op); break;
+    case 'xfer': res = applyXfer(op); break;
+    case 'dels': res = applyDels(op); break;
     case 'cell': { const sh = b.sheet(op.sheet); b.set(sh, op.r, op.c, op.v, { keepNum: true }); if (sh.memoCol && op.memo) b.set(sh, op.r, sh.memoCol, today + ' 変更', { keepNum: false }); cb.analyze(); break; }
     case 'row': { const sh = b.sheet(op.sheet); if (op.n > 0) b.shiftRows(sh, op.at, 1, op.tpl); else b.shiftRows(sh, op.at, -1); cb.analyze(); break; }
   }
@@ -1268,19 +1339,19 @@ async function undo() {
 
 /* ---------- 画面 ---------- */
 function setHeader(p) {
-  $('#back').hidden = S.view !== 'page' && S.view !== 'ai'; $('#back').textContent = S.view === 'page' && S.backTo === 'ai' ? '‹ チェックへ' : '‹ 戻る'; $('#menuBtn').hidden = S.view !== 'page'; $('#swBtn').hidden = S.view === 'start' || S.view === 'page' || S.view === 'ai';
+  $('#back').hidden = S.view !== 'page' && S.view !== 'ai' && S.view !== 'order'; $('#back').textContent = S.view === 'page' && S.backTo === 'ai' ? '‹ チェックへ' : '‹ 戻る'; $('#menuBtn').hidden = S.view !== 'page'; $('#swBtn').hidden = S.view !== 'home';
   $('#undo').disabled = !S.ops.length; $('#undo').hidden = S.view === 'start';
   const h = $('#ttl');
   if (S.view === 'page' && p) h.innerHTML = `${esc(S.cb.title(p))}<span class="pg">${esc(label(p))}・シート「${esc(p.sheet.name.trim())}」</span>`;
-  else h.textContent = S.view === 'start' ? 'チェックシート編集' : S.view === 'ai' ? h.textContent : ((libCur() || {}).name || S.fileName);
+  else h.textContent = S.view === 'start' ? 'チェックシート編集' : S.view === 'ai' || S.view === 'order' ? h.textContent : ((libCur() || {}).name || S.fileName);
   $('#bar').classList.toggle('hide', S.view === 'start');
   const n = S.ops.length; $('#cnt').innerHTML = n ? `変更 <b>${n}</b> 件` : '変更はまだありません'; $('#saveBtn').disabled = !n;
 }
-function render() { if (S.view === 'start') return renderStart(); if (S.view === 'ai') return renderAi(); if (S.view === 'page' && pageByKey(S.pageKey)) return renderPage(); S.view = 'home'; renderHome(); }
-const changedKeys = () => { const s = new Set(); for (const o of S.ops) { if (o.edits) for (const x of o.edits) s.add(x.key.split('#')[0]); if (o.key) s.add(o.key.split('#')[0]); if (o.sheet) s.add(o.sheet); if (o.after) s.add(o.after.split('#')[0]); } return s; };
+function render() { if (S.view === 'start') return renderStart(); if (S.view === 'order' && S.order) return renderOrder(); if (S.view === 'ai') return renderAi(); if (S.view === 'page' && pageByKey(S.pageKey)) return renderPage(); S.view = 'home'; renderHome(); }
+const changedKeys = () => { const s = new Set(); for (const o of S.ops) { if (o.edits) for (const x of o.edits) s.add(x.key.split('#')[0]); if (o.key) s.add(o.key.split('#')[0]); if (o.sheet) s.add(o.sheet); if (o.after) s.add(o.after.split('#')[0]); if (o.src) s.add(o.src.split('#')[0]); if (o.dst) s.add(o.dst.split('#')[0]); if (o.order) for (const n of o.order) s.add(n); } return s; };
 
 function renderHome() {
-  S.pvFit = true; setHeader(); const cb = S.cb; const ch = changedKeys();
+  S.pvFit = true; S.sel = null; setHeader(); const cb = S.cb; const ch = changedKeys();
   const groups = {}; const order = [];
   const add = (g, p) => { if (!groups[g]) { groups[g] = []; order.push(g); } groups[g].push(p); };
   const numbered = cb.pages.filter(p => !p.sheet.hidden && !p.example && p.pn && cb.pageNo(p));
@@ -1297,12 +1368,14 @@ function renderHome() {
   let html = `<div class="top"><div><span class="meta">文書番号</span><b>${esc(dc ? dc.value : '—')}</b></div><span class="topb"><button id="aiBtn">文章・内容チェック</button><button class="pri" id="addPg">＋ ページを追加</button></span></div><input class="search" id="q" type="search" placeholder="工程名・シート名で探す" value="${esc(S.q)}">`;
   for (const g of order) {
     const ps = groups[g].filter(p => !q || (cb.title(p) + ' ' + p.sheet.name).toLowerCase().includes(q)); if (!ps.length) continue;
-    html += `<div class="grp"><span>${esc(g)}</span><span>${ps.length}ページ</span></div><div class="list">` + ps.map(p => { const no = cb.pageNo(p); return `<button class="row" data-k="${esc(key(p))}"><span class="no">${no ? esc(no) : '–'}${no && cb.totalOf(p) ? `<small>/${esc(cb.totalOf(p))}</small>` : ''}</span><span class="t">${esc(cb.title(p))}<small>${p.cols ? p.items.length + '項目' : '表'}・${esc(p.sheet.name.trim())}${p.example ? '（記入例）' : ''}</small></span>${ch.has(p.sheet.name) ? '<span class="dot" aria-label="変更あり"></span>' : ''}</button>`; }).join('') + `</div>`;
+    const gc = ps.find(p => p.cover && isNumbered(p)); const canOrd = !q && gc && groupUnits(gc.cover).length >= 2;
+    html += `<div class="grp"><span>${esc(g)}</span><span>${ps.length}ページ${canOrd ? ` <button class="sm ordbtn" data-cover="${esc(gc.cover)}">⇅ 並べ替え</button>` : ''}</span></div><div class="list">` + ps.map(p => { const no = cb.pageNo(p); return `<button class="row" data-k="${esc(key(p))}"><span class="no">${no ? esc(no) : '–'}${no && cb.totalOf(p) ? `<small>/${esc(cb.totalOf(p))}</small>` : ''}</span><span class="t">${esc(cb.title(p))}<small>${p.cols ? p.items.length + '項目' : '表'}・${esc(p.sheet.name.trim())}${p.example ? '（記入例）' : ''}</small></span>${ch.has(p.sheet.name) ? '<span class="dot" aria-label="変更あり"></span>' : ''}</button>`; }).join('') + `</div>`;
   }
   $('#main').innerHTML = html;
   $('#addPg').onclick = () => addPageDialog();
   $('#aiBtn').onclick = () => openAi(null);
   $('#q').oninput = e => { S.q = e.target.value; const pos = e.target.selectionStart; renderHome(); const n = $('#q'); n.focus(); n.setSelectionRange(pos, pos); };
+  for (const b of document.querySelectorAll('.ordbtn')) b.onclick = () => openOrder(b.dataset.cover);
   for (const b of document.querySelectorAll('.row')) b.onclick = () => { S.backTo = null; S.flash = null; S.pageKey = b.dataset.k; S.view = 'page'; S.mode = pageByKey(S.pageKey).cols ? 'items' : 'grid'; render(); scrollTo(0, 0); };
 }
 
@@ -1314,11 +1387,13 @@ function renderPage() {
   if (p.cols) html += `<button class="ckbtn" id="ckPage"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4 12.5l5 5L20 6.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>このページを文章・内容チェック</button>`;
   if (!p.cols && S.mode === 'grid') html += `<p class="meta">決まった形のないページなので、表のまま編集します。セルをタップで変更、行番号をタップで行の追加・削除。</p>`;
   if (S.mode === 'items') {
-    html += `<p class="meta">項目をタップすると編集・並べ替え・削除ができます。Noは自動で振り直します。</p><div class="items">`;
+    if (S.sel && S.selKey !== key(p)) S.sel = null;
+    html += S.sel ? selBar(p) : `<div class="pvbar"><p class="meta" style="margin:0;flex:1">項目をタップすると編集・並べ替え・削除ができます。Noは自動で振り直します。</p><button class="sm" id="selOn">☑ 選んで移動・コピー</button></div>`;
+    html += `<div class="items${S.sel ? ' selmode' : ''}">`;
     p.items.forEach((it, i) => {
       const o = cb.readItem(p, it); const isToday = (o.memo || '').startsWith(today);
       const sec = o.no === '' && p.cols.no;
-      html += `<button class="card${isToday ? ' chg' : ''}" data-i="${i}"><span class="n${sec ? ' sec' : ''}">${sec ? '見' : esc(o.no)}</span>${o.proc && (o.procTop || i === 0) ? `<span class="proc">${esc(o.proc)}</span>` : ''}<span class="it">${esc(o.item) || '<span style="color:var(--sub)">（空欄）</span>'}</span>${o.std ? `<span class="std">${esc(o.std)}</span>` : ''}${o.memo ? `<span class="memo${isToday ? ' today' : ''}">${esc(o.memo)}</span>` : ''}</button>`;
+      html += `<button class="card${isToday ? ' chg' : ''}${S.sel && S.sel.has(i) ? ' sel' : ''}" data-i="${i}"${S.sel ? ` aria-pressed="${S.sel.has(i)}"` : ''}>${S.sel ? `<span class="ck" aria-hidden="true">${S.sel.has(i) ? '✓' : ''}</span>` : ''}<span class="n${sec ? ' sec' : ''}">${sec ? '見' : esc(o.no)}</span>${o.proc && (o.procTop || i === 0) ? `<span class="proc">${esc(o.proc)}</span>` : ''}<span class="it">${esc(o.item) || '<span style="color:var(--sub)">（空欄）</span>'}</span>${o.std ? `<span class="std">${esc(o.std)}</span>` : ''}${o.memo ? `<span class="memo${isToday ? ' today' : ''}">${esc(o.memo)}</span>` : ''}</button>`;
     });
     if (!p.items.length) html += `<p class="meta" style="text-align:center;padding:24px 0">まだ項目がありません。下のボタンから追加してください。</p>`;
     html += `</div><button class="add" id="addEnd">＋ 最後に項目を追加</button>`;
@@ -1327,7 +1402,9 @@ function renderPage() {
   if ($('#ckPage')) $('#ckPage').onclick = () => openAi(p);
   for (const b of document.querySelectorAll('.tabs button')) b.onclick = () => { S.mode = b.dataset.m; renderPage(); };
   if (S.mode === 'items') {
-    for (const c of document.querySelectorAll('.card')) c.onclick = () => editItem(p, +c.dataset.i);
+    for (const c of document.querySelectorAll('.card')) c.onclick = () => { const i = +c.dataset.i; if (S.sel) { S.sel.has(i) ? S.sel.delete(i) : S.sel.add(i); const y = scrollY; renderPage(); scrollTo(0, y); return; } editItem(p, i); };
+    if ($('#selOn')) $('#selOn').onclick = () => { S.sel = new Set(); S.selKey = key(p); renderPage(); };
+    bindSel(p);
     if (S.flash != null) { const c = document.querySelector(`.card[data-i="${S.flash}"]`); S.flash = null; if (c) { c.classList.add('flash'); setTimeout(() => c.scrollIntoView({ block: 'center' }), 0); } }
     $('#addEnd').onclick = () => addItem(p, p.items.length - 1);
   } else if (S.mode === 'preview') bindPreview(); else bindGrid(p);
@@ -2249,20 +2326,157 @@ async function libBoot() {
   } catch (e) { console.error(e); }
   renderStart();
 }
+/* ---------- 項目の移動・コピー、ページの並べ替え ---------- */
+const isNumbered = p => !p.sheet.hidden && !p.example && p.pn && S.cb.pageNo(p);
+function groupUnits(cover) {
+  const cb = S.cb;
+  const ps = cb.pages.filter(p => p.cover === cover && isNumbered(p) && !cb.isCover(p.sheet)).sort((a, b) => (+cb.pageNo(a)) - (+cb.pageNo(b)));
+  const m = new Map(); for (const p of ps) { if (!m.has(p.sheet)) m.set(p.sheet, []); m.get(p.sheet).push(p); }
+  return [...m.values()];
+}
+function applyOrder(op) {
+  const U = groupUnits(op.cover); const by = new Map(U.map(u => [u[0].sheet.name, u]));
+  const units = op.order.map(n => by.get(n)).filter(Boolean);
+  for (const u of U) if (!units.includes(u)) units.push(u);
+  S.cb.reorderGroup(units);
+}
+function applyXfer(op) {
+  const cb = S.cb, b = S.bk; const src = pageByKey(op.src), dst = pageByKey(op.dst); if (!src || !dst) throw new Error('ページが見つかりません');
+  const sSh = src.sheet, sI = sSh.pages.indexOf(src), dSh = dst.sheet, dI = dSh.pages.indexOf(dst);
+  const idx = op.idx.slice().sort((x, y) => x - y);
+  const data = idx.map(i => {
+    const it = src.items[i]; const o = cb.readItem(src, it); const d = { item: o.item || '', std: o.std || '' };
+    if (dst.cols.work && src.cols.work) d.work = o.work;
+    if (dst.cols.proc && src.cols.proc && o.procTop && o.proc) d.proc = o.proc;
+    const si = c => { const el = c && b.cellEl(sSh, it.r1, c); return el && el.getAttribute('t') === 's' && kid1(el, 'v') ? +kid1(el, 'v').textContent : null; };
+    d._si = { item: si(src.cols.item), std: si(src.cols.std) };
+    return d;
+  });
+  let after = op.at;
+  data.forEach((d, k) => {
+    const p = dSh.pages[dI]; const { _si, ...dd } = d; if (!p.cols.std) delete dd.std;
+    const np = cb.addItem(p, after, dd); const it = np.items[after + 1];
+    if (it) { if (_si.item != null && np.cols.item) b.set(dSh, it.r1, np.cols.item, dd.item, { keepNum: false, siIdx: _si.item }); if (_si.std != null && np.cols.std && dd.std) b.set(dSh, it.r1, np.cols.std, dd.std, { keepNum: false, siIdx: _si.std }); if (op.mode === 'move' && dSh.memoCol) b.set(dSh, it.r1, dSh.memoCol, today + ' 移動', { keepNum: false }); }
+    after++;
+  });
+  if (op.mode === 'move') {
+    const same = sSh === dSh && sI === dI; const n = data.length;
+    const del = idx.map(i => same && i > op.at ? i + n : i).sort((x, y) => y - x);
+    for (const i of del) { const p = sSh.pages[sI]; cb.deleteItem(p, i); }
+  }
+  cb.analyze();
+  return dSh.pages[dI];
+}
+function applyDels(op) {
+  const p = pageByKey(op.key); const sh = p.sheet, pi = sh.pages.indexOf(p);
+  for (const i of op.idx.slice().sort((x, y) => y - x)) S.cb.deleteItem(sh.pages[pi], i);
+  return sh.pages[pi];
+}
+const kid1 = (el, n) => { for (let x = el.firstChild; x; x = x.nextSibling) if (x.nodeType === 1 && (x.localName || x.nodeName) === n) return x; return null; };
+
+/* ---- 項目の選択 ---- */
+function selBar(p) {
+  const n = S.sel ? S.sel.size : 0;
+  return `<div class="selbar" id="selBar"><span class="cnt"><b>${n}</b> 件を選択中</span><button class="sm" id="selAll">${n === p.items.length ? '全部外す' : '全部選ぶ'}</button><button class="sm" id="selMove"${n ? '' : ' disabled'}>移動</button><button class="sm" id="selCopy"${n ? '' : ' disabled'}>コピー</button><button class="sm danger" id="selDel"${n ? '' : ' disabled'}>削除</button><button class="sm" id="selX">終わる</button></div>`;
+}
+function bindSel(p) {
+  if (!$('#selBar')) return;
+  $('#selX').onclick = () => { S.sel = null; renderPage(); };
+  $('#selAll').onclick = () => { S.sel = S.sel.size === p.items.length ? new Set() : new Set(p.items.map((_, i) => i)); renderPage(); };
+  $('#selMove').onclick = () => xferDialog(p, 'move');
+  $('#selCopy').onclick = () => xferDialog(p, 'copy');
+  $('#selDel').onclick = async () => { const n = S.sel.size; if (!(await ask('まとめて削除', `選んだ ${n} 件の項目を削除します。下の項目が詰まります。`, '削除する', 'danger'))) return; const idx = [...S.sel]; S.sel = null; await run({ t: 'dels', key: key(p), idx }, { kind: '削除' }); toast(n + '件を削除しました'); };
+}
+function pageOptions(sel) {
+  const cb = S.cb; let h = ''; let lastG = null;
+  const ps = cb.pages.filter(p => p.cols && !p.sheet.hidden && !p.example).sort((a, b) => ((a.toc || '') > (b.toc || '')) - ((a.toc || '') < (b.toc || '')) || (+cb.pageNo(a) || 999) - (+cb.pageNo(b) || 999));
+  for (const p of ps) { const g = p.toc ? p.toc.replace(/目次/, '') : 'その他'; if (g !== lastG) { if (lastG !== null) h += '</optgroup>'; h += `<optgroup label="${esc(g)}">`; lastG = g; } h += `<option value="${esc(key(p))}"${key(p) === sel ? ' selected' : ''}>${esc(cb.pageNo(p) || '–')}　${esc(cb.title(p))}</option>`; }
+  return h + (lastG !== null ? '</optgroup>' : '');
+}
+function posOptions(p) {
+  const cb = S.cb; let h = '<option value="-1">いちばん上</option>';
+  p.items.forEach((it, i) => { const o = cb.readItem(p, it); h += `<option value="${i}"${i === p.items.length - 1 ? ' selected' : ''}>No.${esc(o.no || '-')}「${esc(short(o.item, 22))}」の下</option>`; });
+  return h;
+}
+async function xferDialog(p, mode) {
+  const idx = [...S.sel].sort((a, b) => a - b); const n = idx.length; const ml = mode === 'move' ? '移動' : 'コピー';
+  const sel = S.lastDst && pageByKey(S.lastDst) ? S.lastDst : key(p);
+  const pr = modal({ title: `${n}件を${ml}`, body: `<label class="f" for="xDst">${ml}先のページ</label><select id="xDst" name="dst" class="xsel">${pageOptions(sel)}</select><label class="f" for="xPos">入れる場所</label><select id="xPos" name="pos" class="xsel">${posOptions(pageByKey(sel))}</select><p class="meta">${mode === 'move' ? '元のページからは消えて、Noは両方のページで振り直します。' : '元のページはそのまま残ります。'}赤字などの文字の書式もそのまま${ml}します。</p>`, buttons: ['|', { label: 'やめる', value: null }, { label: ml + 'する', value: 'ok', cls: 'pri' }] });
+  $('#xDst').onchange = e => { $('#xPos').innerHTML = posOptions(pageByKey(e.target.value)); };
+  const r = await pr; if (r.v !== 'ok') return;
+  const dst = pageByKey(r.data.dst); if (!dst) return; const after = +r.data.pos;
+  S.lastDst = key(dst); S.sel = null;
+  const op = { t: 'xfer', mode, src: key(p), dst: key(dst), idx, at: after };
+  await run(op, { kind: mode === 'move' ? '移動' : '追加', srcTitle: S.cb.title(p), srcLabel: label(p), dstTitle: S.cb.title(dst), dstLabel: label(dst), n });
+  toast(`${n}件を「${S.cb.title(dst)}」に${ml}しました`);
+}
+
+/* ---- ページの並べ替え ---- */
+function openOrder(cover) { S.order = { cover, units: groupUnits(cover).map(u => u[0].sheet.name) }; S.view = 'order'; render(); scrollTo(0, 0); }
+function renderOrder() {
+  setHeader(); $('#ttl').textContent = 'ページの並べ替え';
+  const O = S.order; const cb = S.cb; const U = groupUnits(O.cover); const by = new Map(U.map(u => [u[0].sheet.name, u]));
+  const orig = U.map(u => u[0].sheet.name); const changed = O.units.join('\n') !== orig.join('\n');
+  const nums = U.flat().map(p => +cb.pageNo(p)).sort((a, b) => a - b); let k = 0;
+  const cover = cb.pages.find(p => p.cover === O.cover && cb.isCover(p.sheet));
+  let h = `<p class="meta">右の <b>≡</b> を押したまま上下に動かすか、▲▼で順番を変えます。最後に「この順番にする」を押すと、ページ番号・目次・シートの並びがそろいます。</p>`;
+  if (cover) h += `<div class="ord fixed"><span class="no">${esc(cb.pageNo(cover) || '')}</span><span class="t">${esc(cb.title(cover))}<small>表紙（動かせません）</small></span></div>`;
+  h += '<div id="ordList">';
+  O.units.forEach((n, i) => {
+    const u = by.get(n); if (!u) return; const att = cb.attachedSheets(u[0].sheet);
+    const no = u.map(() => nums[k++]); const was = u.map(p => cb.pageNo(p));
+    const moved = no.join() !== was.join();
+    h += `<div class="ord${moved ? ' mv' : ''}" data-i="${i}"><span class="no">${no.join('<br>')}${moved ? `<small>元 ${was.join(',')}</small>` : ''}</span><span class="t">${u.map(p => esc(cb.title(p))).join('<br>')}<small>シート「${esc(n.trim())}」${u.length > 1 ? `・${u.length}ページ一緒に動きます` : ''}${att.length ? `・別紙 ${att.map(s => esc(s.name.trim())).join('、')} も一緒` : ''}</small></span><span class="ordb"><button class="ghost ic sm" data-up="${i}" aria-label="上へ"${i ? '' : ' disabled'}>▲</button><button class="ghost ic sm" data-dn="${i}" aria-label="下へ"${i < O.units.length - 1 ? '' : ' disabled'}>▼</button></span><span class="hdl" data-h="${i}" aria-label="ドラッグで移動">≡</span></div>`;
+  });
+  h += `</div><div class="stick"><div class="row2" style="margin:0"><button class="sm" id="ordReset"${changed ? '' : ' disabled'}>元の順番に戻す</button><button class="pri" id="ordGo"${changed ? '' : ' disabled'} style="flex:1 1 auto">この順番にする</button></div></div>`;
+  $('#main').innerHTML = h;
+  const mv = (i, j) => { const a = O.units; const [x] = a.splice(i, 1); a.splice(j, 0, x); renderOrder(); };
+  for (const b of document.querySelectorAll('[data-up]')) b.onclick = () => mv(+b.dataset.up, +b.dataset.up - 1);
+  for (const b of document.querySelectorAll('[data-dn]')) b.onclick = () => mv(+b.dataset.dn, +b.dataset.dn + 1);
+  $('#ordReset').onclick = () => { O.units = orig.slice(); renderOrder(); };
+  $('#ordGo').onclick = async () => {
+    await run({ t: 'order', cover: O.cover, order: O.units.slice() }, { kind: 'ページ順番変更', title: 'ページの順番', label: '' });
+    S.view = 'home'; render(); toast('ページの順番を変えました');
+  };
+  bindDrag();
+}
+function bindDrag() {
+  const list = $('#ordList'); if (!list) return;
+  for (const hd of list.querySelectorAll('.hdl')) hd.onpointerdown = e => {
+    e.preventDefault(); const el = hd.closest('.ord'); const from = +el.dataset.i; const items = [...list.querySelectorAll('.ord')];
+    const r0 = el.getBoundingClientRect(); const ph = document.createElement('div'); ph.className = 'ordph'; ph.style.height = r0.height + 'px';
+    el.after(ph); el.classList.add('drag'); el.style.width = r0.width + 'px'; el.style.top = r0.top + 'px'; el.style.left = r0.left + 'px';
+    const dy = e.clientY - r0.top; let to = from; hd.setPointerCapture(e.pointerId);
+    let raf = null, lastY = e.clientY;
+    const scroll = () => { const m = 70; if (lastY < m) scrollBy(0, -12); else if (lastY > innerHeight - m - 80) scrollBy(0, 12); raf = requestAnimationFrame(scroll); }; raf = requestAnimationFrame(scroll);
+    hd.onpointermove = ev => {
+      lastY = ev.clientY; el.style.top = (ev.clientY - dy) + 'px';
+      const others = items.filter(x => x !== el); let idx = others.length;
+      for (let k = 0; k < others.length; k++) { const r = others[k].getBoundingClientRect(); if (ev.clientY < r.top + r.height / 2) { idx = k; break; } }
+      to = idx; const ref = others[idx]; if (ref) ref.before(ph); else list.appendChild(ph);
+    };
+    hd.onpointerup = hd.onpointercancel = () => {
+      cancelAnimationFrame(raf); hd.onpointermove = hd.onpointerup = hd.onpointercancel = null;
+      const a = S.order.units; const [x] = a.splice(from, 1); a.splice(to, 0, x); renderOrder();
+    };
+  };
+}
 
 /* ---------- 保存 ---------- */
-const KIND = { '文言修正': '文言修正', '追加': 'チェック項目追加', '変更': 'チェック項目変更', '削除': 'チェック項目削除', 'ページ追加': 'ページ追加', 'ページ削除': 'ページ削除', 'ページ名変更': 'ページ名変更' };
+const KIND = { '移動': 'チェック項目移動', 'ページ順番変更': 'ページ順番変更', '文言修正': '文言修正', '追加': 'チェック項目追加', '変更': 'チェック項目変更', '削除': 'チェック項目削除', 'ページ追加': 'ページ追加', 'ページ削除': 'ページ削除', 'ページ名変更': 'ページ名変更' };
 function revEntries() {
   const m = new Map();
   for (const o of S.ops) {
     if (o.t === 'ai') { for (const x of o.edits) { const t = x.title; if (!m.has(t)) m.set(t, { proc: t, page: x.label || '', kinds: new Set() }); m.get(t).kinds.add(KIND[x.kind || '文言修正'] || '文言修正'); } continue; }
+    if (o.t === 'xfer') { const i = o.info || {}; const put = (t, pg, k) => { if (!t) return; if (!m.has(t)) m.set(t, { proc: t, page: pg || '', kinds: new Set() }); m.get(t).kinds.add(k); }; if (o.mode === 'move') { put(i.srcTitle, i.srcLabel, 'チェック項目移動'); put(i.dstTitle, i.dstLabel, 'チェック項目移動'); } else put(i.dstTitle, i.dstLabel, 'チェック項目追加'); continue; }
+    if (o.t === 'order') { const t = 'ページの順番'; if (!m.has(t)) m.set(t, { proc: t, page: '', kinds: new Set(), fixed: true }); m.get(t).kinds.add('ページ順番変更'); continue; }
     const i = o.info || {}; if (i.example) continue;
     const t = i.title || o.sheet || '';
     if (!m.has(t)) m.set(t, { proc: t, page: i.label || '', kinds: new Set() });
     const e = m.get(t); e.kinds.add(KIND[i.kind] || 'チェック項目変更');
     if (o.after) { const p = pageByKey(o.after); if (p) e.page = label(p); }
   }
-  for (const e of m.values()) { const p = S.cb.pages.find(x => !x.example && !x.sheet.hidden && S.cb.title(x) === e.proc) || S.cb.pages.find(x => S.cb.title(x) === e.proc); if (p && !e.kinds.has('ページ削除')) e.page = label(p); e.content = [...e.kinds].join('、'); }
+  for (const e of m.values()) { if (e.fixed) { e.content = [...e.kinds].join('、'); continue; } const p = S.cb.pages.find(x => !x.example && !x.sheet.hidden && S.cb.title(x) === e.proc) || S.cb.pages.find(x => S.cb.title(x) === e.proc); if (p && !e.kinds.has('ページ削除')) e.page = label(p); e.content = [...e.kinds].join('、'); }
   return [...m.values()];
 }
 async function save() {
@@ -2298,7 +2512,7 @@ async function deliver(blob, name) {
 }
 
 /* ---------- 起動 ---------- */
-$('#back').onclick = () => { if (S.view === 'page' && S.backTo === 'ai' && S.ai) { S.backTo = null; S.view = 'ai'; render(); return; } S.view = S.view === 'ai' && S.ai && S.ai.from ? 'page' : 'home'; if (S.view === 'page') S.pageKey = S.ai.from; render(); };
+$('#back').onclick = () => { if (S.view === 'order') { S.view = 'home'; render(); return; } if (S.view === 'page' && S.backTo === 'ai' && S.ai) { S.backTo = null; S.view = 'ai'; render(); return; } S.view = S.view === 'ai' && S.ai && S.ai.from ? 'page' : 'home'; if (S.view === 'page') S.pageKey = S.ai.from; render(); };
 $('#undo').onclick = undo;
 $('#menuBtn').onclick = () => pageMenu();
 $('#saveBtn').onclick = save;
