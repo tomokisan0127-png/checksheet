@@ -119,12 +119,12 @@ label.f{display:block;font-size:14px;color:var(--sub);margin:12px 0 4px;font-wei
 .opt input{width:22px;height:22px;flex:none;accent-color:var(--pri)}
 .opt.dis{opacity:.45;cursor:default}
 .box{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:6px 12px;box-shadow:var(--shadow)}
-.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.seg{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
 .seg label{display:block;border:1.5px solid var(--line);border-radius:10px;padding:10px;cursor:pointer;background:var(--paper)}
 .seg label:has(input:checked){border-color:var(--pri);background:var(--lo-bg)}
 .seg input{position:absolute;opacity:0;pointer-events:none}
 .seg b{display:block;font-size:15px}.seg small{display:block;font-size:12px;color:var(--sub);line-height:1.4;margin-top:2px}
-@media(max-width:520px){.seg{grid-template-columns:1fr}}
+
 .chips{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}
 .chips button{min-height:40px;border-radius:999px;font-size:14px;padding:0 14px}
 .chips button[aria-pressed=true]{background:var(--ink);color:#fff;border-color:var(--ink)}
@@ -173,6 +173,11 @@ table.pv td[style*="white-space:pre;"]{overflow:visible}
 .ftags{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
 .gtag{color:var(--md-tx);background:var(--md-bg);border-radius:6px;padding:1px 8px;font-size:12px;font-weight:700}
 .delx del{color:var(--hi-tx)}
+.libh{font-size:16px;margin:18px 0 8px}
+.lib{display:flex;align-items:center;border-top:1px solid var(--line)}.lib:first-child{border-top:0}
+.lib .row{border-top:0;flex:1}.lib.cur{background:var(--lo-bg)}
+.lib .t b{font-size:16px}
+header .sw{display:flex;align-items:center;gap:4px;color:var(--pri);padding:0 10px;font-size:15px}
 .card.flash{outline:3px solid var(--pri);outline-offset:2px}
 .err{color:var(--hi-tx);background:var(--hi-bg);border-radius:10px;padding:10px 12px;font-size:14px}
 </style>
@@ -181,6 +186,7 @@ table.pv td[style*="white-space:pre;"]{overflow:visible}
 <header>
   <button class="ghost" id="back" aria-label="戻る" hidden>‹ 戻る</button>
   <h1 id="ttl">チェックシート編集</h1>
+  <button class="ghost sw" id="swBtn" hidden aria-label="チェックシートを切り替える"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4 3 8l4 4"/><path d="M3 8h13"/><path d="m17 20 4-4-4-4"/><path d="M21 16H8"/></svg>切替</button>
   <button class="ghost ic" id="undo" disabled aria-label="元に戻す" title="元に戻す"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></button>
   <button class="ghost ic" id="menuBtn" hidden aria-label="ページ操作" title="ページ操作"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><circle cx="5" cy="12" r="2.2"/><circle cx="12" cy="12" r="2.2"/><circle cx="19" cy="12" r="2.2"/></svg></button>
 </header>
@@ -1175,7 +1181,8 @@ async function ask(title, text, okLabel = 'OK', cls = 'pri') { const r = await m
 /* ---------- ファイル読込 ---------- */
 function renderStart() {
   S.view = 'start'; setHeader();
-  $('#main').innerHTML = `<div class="drop" id="drop">
+  const saved = LIB.list.length ? `<h2 class="libh">この端末に保存してあるチェックシート</h2><div class="list">${libRowsHtml(null)}</div><h2 class="libh">新しいExcelを開く</h2>` : '';
+  $('#main').innerHTML = saved + `<div class="drop" id="drop">
   <svg class="sheetpic" viewBox="0 0 320 150" aria-hidden="true"><rect x="40" y="8" width="240" height="138" rx="6" fill="var(--paper)" stroke="var(--ink)" stroke-width="2"/><rect x="40" y="8" width="240" height="26" rx="6" fill="var(--tint)" stroke="var(--ink)" stroke-width="2"/><g stroke="var(--line)" stroke-width="1.5">${[56, 78, 100, 122].map(y => `<line x1="40" y1="${y}" x2="280" y2="${y}"/>`).join('')}<line x1="66" y1="34" x2="66" y2="146"/><line x1="200" y1="34" x2="200" y2="146"/><line x1="240" y1="34" x2="240" y2="146"/></g><g fill="var(--ink)">${[45, 67, 89, 111, 133].map((y, i) => `<text x="53" y="${y + 4}" font-size="11" text-anchor="middle">${i + 1}</text><rect x="74" y="${y - 2}" width="${[110, 92, 118, 70, 100][i]}" height="5" rx="2" opacity=".75"/>`).join('')}</g><rect x="72" y="85" width="122" height="13" fill="var(--mark)"/><rect x="74" y="89" width="118" height="5" rx="2" fill="var(--ink)"/><circle cx="258" cy="92" r="17" fill="none" stroke="var(--red)" stroke-width="2.5"/><text x="258" y="97" text-anchor="middle" font-size="13" font-weight="700" fill="var(--red)">変更</text></svg>
   <h2>チェックシートを開く</h2>
   <p>最新のチェックシート（.xlsx）を選んでください</p>
@@ -1183,6 +1190,8 @@ function renderStart() {
   <input type="file" id="file" accept=".xlsx,.xlsm,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
   <div class="note">元が .xls の場合は、先にExcelで「名前を付けて保存」→「Excel ブック (*.xlsx)」で保存し直してから選んでください。書式・図・数式はそのまま残ります。</div></div>`;
   $('#pick').onclick = () => $('#file').click();
+  for (const x of document.querySelectorAll('.libo')) x.onclick = () => libOpen(x.dataset.id);
+  for (const x of document.querySelectorAll('.libm')) x.onclick = async () => { await libMenu(x.dataset.id); render(); };
   $('#file').onchange = e => e.target.files[0] && openFile(e.target.files[0]);
   const dp = $('#drop');
   dp.ondragover = e => { e.preventDefault(); dp.classList.add('on'); }; dp.ondragleave = () => dp.classList.remove('on');
@@ -1195,9 +1204,13 @@ async function openFile(f) {
     const buf = await f.arrayBuffer(); const h = new Uint8Array(buf.slice(0, 4));
     if (h[0] === 0xD0 && h[1] === 0xCF && h[2] === 0x11 && h[3] === 0xE0) { busy(false); await modal({ title: '中身が .xls のままです', body: '<p>ファイル名の末尾だけ「.xlsx」に変えたもののようです。中身は古い .xls 形式のままなので開けません。</p><p>Excelで開いて <b>ファイル → 名前を付けて保存 →「ファイルの種類」で「Excel ブック (*.xlsx)」</b> を選んで保存したファイルを選んでください。</p>', buttons: ['|', { label: 'わかった', cls: 'pri' }] }); return; }
     if (!(h[0] === 0x50 && h[1] === 0x4B)) { busy(false); await modal({ title: 'Excelファイルとして読めません', body: '<p>.xlsx 形式のExcelファイルを選んでください。</p>', buttons: ['|', { label: 'わかった', cls: 'pri' }] }); return; }
+    const prev = { orig: S.orig, fileName: S.fileName, ops: S.ops, view: S.view };
     S.orig = buf; S.fileName = f.name.replace(/\.[^.]+$/, ''); S.ops = [];
     await rebuild();
-    S.view = 'home'; render();
+    busy(false);
+    let ok = false; try { ok = await libAdopt(buf); } catch (e) { console.error(e); toast('この端末に保存できませんでした（このまま編集はできます）'); LIB.id = null; ok = true; }
+    if (!ok) { S.orig = prev.orig; S.fileName = prev.fileName; S.ops = prev.ops; if (S.orig) { await rebuild(); S.view = 'home'; } else S.view = 'start'; render(); return; }
+    S.ai = null; S.pageKey = null; S.view = 'home'; render(); scrollTo(0, 0);
   } catch (e) { console.error(e); toast('読み込めませんでした：' + e.message); }
   busy(false);
 }
@@ -1236,7 +1249,7 @@ async function run(op, info) {
     op.info = info || {};
     if (p) { op.info.title = op.info.title || S.cb.title(p); op.info.label = label(p); op.info.toc = p.toc; op.info.example = p.example; }
     const res = apply(op, false);
-    S.ops.push(op);
+    S.ops.push(op); persistOps();
     if (res) S.pageKey = key(res);
     if (op.t === 'delPage') { S.view = 'home'; S.pageKey = null; }
     if (op.t === 'addPage' && res) op.info.label = label(res), op.info.title = op.v;
@@ -1246,7 +1259,7 @@ async function run(op, info) {
 async function undo() {
   if (!S.ops.length) return;
   busy(true); await tick();
-  const op = S.ops.pop();
+  const op = S.ops.pop(); persistOps();
   await rebuild();
   if (S.pageKey && !pageByKey(S.pageKey)) { S.view = 'home'; S.pageKey = null; }
   if (op.t === 'delPage' && op.key) { S.pageKey = op.key; S.view = 'page'; }
@@ -1255,11 +1268,11 @@ async function undo() {
 
 /* ---------- 画面 ---------- */
 function setHeader(p) {
-  $('#back').hidden = S.view !== 'page' && S.view !== 'ai'; $('#back').textContent = S.view === 'page' && S.backTo === 'ai' ? '‹ チェックへ' : '‹ 戻る'; $('#menuBtn').hidden = S.view !== 'page';
+  $('#back').hidden = S.view !== 'page' && S.view !== 'ai'; $('#back').textContent = S.view === 'page' && S.backTo === 'ai' ? '‹ チェックへ' : '‹ 戻る'; $('#menuBtn').hidden = S.view !== 'page'; $('#swBtn').hidden = S.view === 'start' || S.view === 'page' || S.view === 'ai';
   $('#undo').disabled = !S.ops.length; $('#undo').hidden = S.view === 'start';
   const h = $('#ttl');
   if (S.view === 'page' && p) h.innerHTML = `${esc(S.cb.title(p))}<span class="pg">${esc(label(p))}・シート「${esc(p.sheet.name.trim())}」</span>`;
-  else h.textContent = S.view === 'start' ? 'チェックシート編集' : S.fileName;
+  else h.textContent = S.view === 'start' ? 'チェックシート編集' : S.view === 'ai' ? h.textContent : ((libCur() || {}).name || S.fileName);
   $('#bar').classList.toggle('hide', S.view === 'start');
   const n = S.ops.length; $('#cnt').innerHTML = n ? `変更 <b>${n}</b> 件` : '変更はまだありません'; $('#saveBtn').disabled = !n;
 }
@@ -1626,6 +1639,32 @@ function aiPrompt(tg, mode, refs) {
   const data = JSON.stringify(tg.map(x => ({ id: x.id, page: x.page, no: x.no, item: x.item, std: x.std })), null, 0).replace(/},{/g, '},\n{');
   const refBlock = refs && refs.length ? `\n\n【他機種（参考）】${S.ref.label} の同じページです。直す対象ではありません。\n` + refs.map(r => `■${r.page}（こちらの「${r.mine}」に対応）\n` + JSON.stringify(r.items.map(x => ({ no: x.no, item: x.item, std: x.std })), null, 0).replace(/},{/g, '},\n{')).join('\n') : '';
   const withRef = !!refBlock;
+  if (mode === 'drawing') return `あなたは工作機械の組立職場で、「組立チェックシート」を図面と照らし合わせて確認（照査）する担当です。
+この依頼文と一緒に添付した図面（組立図・部品図・配管図・電気図など）と、下の【対象】のチェック項目を照査してください。
+
+【照査する点】
+A. 番号：チェックシートに書かれた図面番号・品番・風船番号が、図面にあるか・合っているか
+B. 数値：寸法・公差・トルク・隙間・本数・ヶ所数が、図面の指示と合っているか
+C. 部品・ねじ：ねじサイズ（M8 など）・ボルトの種類（HC／HS など）・長さが、図面と合っているか
+D. 向き・位置：取付の向き・基準側・取付位置の指示が合っているか
+E. 確認の抜け：図面の注記（締付トルク、接着剤・グリス塗布、向きの指定、重要マークなど）のうち、チェック項目にないもの
+F. 図面で確認できない記述：チェックシートにあるが、添付の図面では確認できないもの（図面の版が違う可能性）
+
+【守ること】
+- 図面から読み取れたことだけを根拠にする。読み取れない・添付の図面に載っていないものは、推測せず「図面で確認できない」とする。
+- msg は80字以内で、図面上の根拠（図面番号・注記番号・風船番号・寸法など）を入れる。
+- 指摘には、できるだけ fix を付けて「こちらの文言はいかがですか」という直し案を出す（id・item・std。item と std は直したあとの全文）。図面から読めない数値は「□□」と書く。
+- 確認の抜け（E）は、ids に関係の深い項目の id を1つ入れ、fix に {"id":その id,"add":[{"item":"〜しましたか","std":"〜"}]} として、その項目の下に追加する項目案を入れる。
+- 問題がない項目は findings に入れない。
+- 図面が添付されていない・読めない場合は、findings を空にして "error" に理由を書く。
+- level は「要確認」（図面と食い違う）／「注意」（図面で確認できない・あいまい）／「提案」（追加した方がよい確認）のどれか。
+- type は 図面と不一致／図面で確認できない／確認の抜け／その他 のどれか。
+
+【出力】JSONだけを返してください（説明文やコードブロックは不要）。
+{"drawings":["読み取った図面番号と図面名"],"findings":[{"ids":["3"],"level":"要確認","type":"図面と不一致","msg":"図面 注記2 は M8×25、シートは HC8×20","fix":{"id":"3","item":"補材はHC8×25を使用して取り付けましたか","std":"図面確認"}},{"ids":["5"],"level":"提案","type":"確認の抜け","msg":"図面 注記4 のグリス塗布の確認がない","fix":{"id":"5","add":[{"item":"ブッシュ内面にグリスを塗布しましたか","std":"手で塗布\\nグリス:□□"}]}}]}
+${S.ai && S.ai.drawInfo && S.ai.drawInfo.trim() ? `\n【図面について（作業者からのメモ）】\n${S.ai.drawInfo.trim()}\n` : ''}
+【対象】
+${data}`;
   if (mode === 'text') return `あなたは工作機械の組立職場で使う「組立チェックシート」の文章を見直す担当です。
 次のルールで、各項目の「チェック項目(item)」と「基準値／測定具(std)」を直してください。
 
@@ -1664,7 +1703,7 @@ type は 矛盾／重複／単位／基準なし／あいまい／抜け／順�
 ${data}${refBlock}`;
 }
 function promptRefs(tg) {
-  const A = S.ai; if (!S.ref || !A.useRef || A.mode === 'text') return [];
+  const A = S.ai; if (!S.ref || !A.useRef || A.mode === 'text' || A.mode === 'drawing') return [];
   const out = []; for (const k of byKey(tg).keys()) { const p = pageByKey(k); const rp = p && pairOf(p); if (rp) out.push({ page: S.ref.cb.title(rp), mine: S.cb.title(p), items: refItems(rp) }); }
   return out;
 }
@@ -1685,8 +1724,9 @@ function parseAi(txt) {
   t = t.slice(a, b + 1).replace(/[“”]/g, '"');
   let j; try { j = JSON.parse(t); } catch (e) { try { j = JSON.parse(fixJsonText(t).replace(/,\s*([}\]])/g, '$1')); } catch (e2) { throw new Error('JSONの形が崩れています（途中で切れている可能性があります）'); } }
   if (Array.isArray(j)) j = { items: j };
-  const o = { items: Array.isArray(j.items) ? j.items : [], findings: Array.isArray(j.findings) ? j.findings : [], tags: j.tags && typeof j.tags === 'object' ? j.tags : {} };
-  if (!o.items.length && !o.findings.length && !Object.keys(o.tags).length) throw new Error('items・findings が見つかりません');
+  const o = { items: Array.isArray(j.items) ? j.items : [], findings: Array.isArray(j.findings) ? j.findings : [], tags: j.tags && typeof j.tags === 'object' && !Array.isArray(j.tags) ? j.tags : {}, drawings: Array.isArray(j.drawings) ? j.drawings.map(String) : [] };
+  if (j.error && !o.findings.length && !o.items.length) throw new Error('AIからの返事：' + String(j.error));
+  if (!o.items.length && !o.findings.length && !Object.keys(o.tags).length && !o.drawings.length) throw new Error('items・findings が見つかりません');
   return o;
 }
 function buildRes(arr, tg) {
@@ -1712,7 +1752,7 @@ function buildAll(o, tg) {
     R.push({ kind: 'find', src: 'ai', level, lv: LV[level], type: String(f.type || '').trim(), ts: ids.map(id => tm[id]), msg, fixes });
   }
   const tags = {}; for (const c of CATS) { const v = o.tags[c]; tags[c] = (Array.isArray(v) ? v : []).map(String).filter(id => tm[id]).map(id => tm[id]); }
-  return { R, tags };
+  return { R, tags, drawings: o.drawings };
 }
 
 /* ---- 画面 ---- */
@@ -1797,10 +1837,11 @@ function renderAiTab(tg) {
   const md = (v, t, s) => `<label><input type="radio" name="md" value="${v}"${A.mode === v ? ' checked' : ''}><b>${t}</b><small>${s}</small></label>`;
   const prm = curPrompt(tg); const long = prm.length > 45000;
   let h = `<p class="meta">社内で使っているAI（Claudeなど）に、コピーと貼り付けでチェックしてもらいます。ツール自体はネットにつながりません。会社のAI利用ルールの範囲で使ってください。</p>
-  <div class="seg">${md('content', '内容チェック', '矛盾・重複・単位・基準なし・抜け・順序・分類')}${md('text', '文章の見直し', '誤字・表記ゆれ・問いかけの形')}${md('both', '両方', '文章の直しと内容チェックを一度に')}</div>
-  ${S.ref && A.mode !== 'text' ? `<label class="opt"><input type="checkbox" id="useRef"${A.useRef ? ' checked' : ''}> ${esc(S.ref.label)} の同じページも参考として送る（${byKeyCount(tg)}ページ）</label>` : ''}
-  ${!S.ref && A.mode !== 'text' ? '<p class="meta">他機種と比べたいときは「自動チェック」で比べるファイルを選ぶと、AIにも参考として送れます。</p>' : ''}
-  <h3><span class="stp">3</span>依頼文をコピーしてAIに送る</h3>
+  <div class="seg">${md('content', '内容チェック', '矛盾・重複・単位・基準なし・抜け・順序・分類')}${md('drawing', '図面と照査', '図面を添付して、番号・数値・ねじ・注記の抜けを照合')}${md('text', '文章の見直し', '誤字・表記ゆれ・問いかけの形')}${md('both', '両方', '文章の直しと内容チェックを一度に')}</div>
+  ${A.mode === 'drawing' ? drawBox(tg) : ''}
+  ${S.ref && A.mode !== 'text' && A.mode !== 'drawing' ? `<label class="opt"><input type="checkbox" id="useRef"${A.useRef ? ' checked' : ''}> ${esc(S.ref.label)} の同じページも参考として送る（${byKeyCount(tg)}ページ）</label>` : ''}
+  ${!S.ref && A.mode !== 'text' && A.mode !== 'drawing' ? '<p class="meta">他機種と比べたいときは「自動チェック」で比べるファイルを選ぶと、AIにも参考として送れます。</p>' : ''}
+  <h3><span class="stp">3</span>依頼文をコピーしてAIに送る${A.mode === 'drawing' ? '（図面も添付）' : ''}</h3>
   ${long ? `<p class="err">依頼文が長いので（約${Math.round(prm.length / 1000)}千字）、AIの返事が途中で切れることがあります。範囲を「このページだけ」や「今回変更したページ」に絞るのがおすすめです。</p>` : ''}
   <div class="row2"><button class="pri" id="aiCopy"${tg.length ? '' : ' disabled'}>AIへの依頼文をコピー</button></div>
   <details><summary class="meta">依頼文の中身を見る</summary><textarea id="aiPrompt" readonly>${esc(prm)}</textarea></details>
@@ -1808,15 +1849,28 @@ function renderAiTab(tg) {
   $('#ckBody').innerHTML = h;
   for (const r of document.querySelectorAll('input[name=md]')) r.onchange = () => { A.mode = r.value; A.res = null; renderAi(); };
   if ($('#useRef')) $('#useRef').onchange = e => { A.useRef = e.target.checked; renderAi(); };
+  if ($('#drawInfo')) $('#drawInfo').onchange = e => { A.drawInfo = e.target.value; renderAi(); };
   $('#aiCopy').onclick = async () => { const t = curPrompt(tg); A.sig = sigOf(tg); try { await navigator.clipboard.writeText(t); toast('コピーしました。AIに貼り付けて送ってください'); } catch (e) { const ta = $('#aiPrompt'); ta.closest('details').open = true; ta.select(); try { document.execCommand('copy'); toast('コピーしました'); } catch (e2) { toast('自動でコピーできません。下の欄を選んでコピーしてください'); } } };
   $('#aiLoad').onclick = () => {
     A.raw = $('#aiRes').value;
     if (A.sig && A.sig !== sigOf(tg)) { $('#aiMsg').innerHTML = '<p class="err">依頼文をコピーしたあとに、範囲かシートの中身が変わっています。もう一度「AIへの依頼文をコピー」からやり直してください。</p>'; return; }
-    try { const o = parseAi(A.raw); const b = buildAll(o, tg); A.res = b.R.sort((x, y) => LV_ORDER[x.lv] - LV_ORDER[y.lv]); A.tags = b.tags; A.resSig = sigOf(tg); A.filter = 'all'; renderAi(); }
-    catch (e) { $('#aiMsg').innerHTML = `<p class="err">読み込めませんでした：${esc(e.message)}。AIの返事を最初から最後まで全部貼り付けてください。</p>`; }
+    try { const o = parseAi(A.raw); const b = buildAll(o, tg); A.res = b.R.sort((x, y) => LV_ORDER[x.lv] - LV_ORDER[y.lv]); A.tags = b.tags; A.drawings = b.drawings; A.resSig = sigOf(tg); A.filter = 'all'; renderAi(); }
+    catch (e) { $('#aiMsg').innerHTML = /^AIからの返事/.test(e.message) ? `<p class="err">${esc(e.message)}。図面を添付してから、もう一度依頼してください。</p>` : `<p class="err">読み込めませんでした：${esc(e.message)}。AIの返事を最初から最後まで全部貼り付けてください。</p>`; }
   };
   if (A.res && A.resSig !== sigOf(tg)) { A.res = null; $('#aiMsg').innerHTML = '<p class="err">シートが変わったため、前の結果は消しました。必要ならもう一度依頼してください。</p>'; }
-  if (A.res) showResults(A.res, { empty: '直すところ・気になる点はありませんでした。', tags: A.tags });
+  if (A.res) showResults(A.res, { empty: A.mode === 'drawing' ? '図面と食い違う点・抜けは見つかりませんでした。' : '直すところ・気になる点はありませんでした。', tags: A.tags, drawings: A.drawings });
+}
+function drawNos(tg) {
+  const set = new Map();
+  for (const t of tg) for (const m of (t.item + '\n' + t.std).normalize('NFKC').matchAll(/\b([A-Z]{1,3}\d{1,3}-[0-9A-Z]{3,6}-\d{1,3}|PL\s*:?\s*\d{4,6}|GTI-\d{4,7})\b/g)) { const k = m[1].replace(/\s+/g, ''); if (!set.has(k)) set.set(k, []); set.get(k).push(t.no || '-'); }
+  return [...set];
+}
+function drawBox(tg) {
+  const A = S.ai; const ns = drawNos(tg);
+  return `<div class="box" style="padding:10px 12px;margin-top:10px"><b style="font-size:15px">図面の用意</b>
+  <ol class="meta" style="margin:6px 0;padding-left:20px"><li>このページに関係する図面（PDF・写真）を用意します。写真は図面全体と、細かい注記の拡大を撮ると読み取りやすくなります。</li><li>下の「依頼文をコピー」を押し、AIの画面に<b>図面を添付してから</b>依頼文を貼り付けて送ります。</li><li>範囲は「このページだけ」がおすすめです（図面1〜3枚に対して1ページ）。</li></ol>
+  ${ns.length ? `<p class="meta" style="margin:6px 0 2px"><b>このページに出てくる図面番号</b>（この図面を添付すると確実です）</p><p style="margin:0 0 6px;font-size:15px">${ns.map(([k, v]) => `<span class="badge ty" style="margin:2px 4px 2px 0">${esc(k)}</span><small class="meta">No.${esc([...new Set(v)].join(','))}</small>`).join('　')}</p>` : ''}
+  <label for="drawInfo" style="font-size:14px;color:var(--sub);font-weight:700;display:block;margin:8px 0 4px">図面についてのメモ（任意）</label><textarea id="drawInfo" style="min-height:64px" placeholder="例：組立図 L00-00000-00 Rev.C と配管図を添付。風船番号は組立図のもの">${esc(A.drawInfo || '')}</textarea></div>`;
 }
 const byKeyCount = tg => { let n = 0; for (const k of byKey(tg).keys()) { const p = pageByKey(k); if (p && pairOf(p)) n++; } return n; };
 
@@ -1867,6 +1921,7 @@ function showResults(R, opt) {
   const f = A.filter || 'all';
   const show = r => f === 'all' || (f === 'ref' ? /他機種/.test(r.type || '') : r.lv === f);
   let h = `<h3><span class="stp">✓</span>結果</h3>`;
+  if (opt.drawings && opt.drawings.length) h += `<div class="box" style="padding:8px 12px;margin-bottom:8px"><b style="font-size:14px">AIが読み取った図面</b><br><span class="meta">${opt.drawings.map(esc).join('／')}</span></div>`;
   if (!R.length) { out.innerHTML = h + `<p class="meta">${opt.empty}</p>` + (opt.tags ? tagsHtml(opt.tags) : ''); return; }
   h += `<div class="sum">${cnt.hi ? `<div class="hi">要確認<b>${cnt.hi}</b></div>` : ''}${cnt.md ? `<div class="md">注意<b>${cnt.md}</b></div>` : ''}${cnt.lo ? `<div class="lo">提案<b>${cnt.lo}</b></div>` : ''}${cnt.ed ? `<div class="ed">文言の修正<b>${cnt.ed}</b></div>` : ''}</div>`;
   const chip = (v, l, n) => n || v === 'all' ? `<button data-fl="${v}" aria-pressed="${f === v}">${l}${v === 'all' ? '' : ` ${n}`}</button>` : '';
@@ -1953,7 +2008,7 @@ async function runBatch(edits, struct) {
       for (let j = x.adds.length - 1; j >= 0; j--) { const p2 = pageByKey(x.t.key); const d = { item: x.adds[j].item }; if (p2.cols.std) d.std = x.adds[j].std; const op = { t: 'add', key: key(p2), i: x.t.i, d, info: { kind: '追加', title: S.cb.title(p2), label: label(p2), toc: p2.toc, example: p2.example } }; apply(op, false); S.ops.push(op); }
     }
   } catch (e) { console.error(e); toast('うまくできませんでした：' + e.message); }
-  busy(false); render();
+  persistOps(); busy(false); render();
 }
 function tagsHtml(tags) {
   const n = CATS.reduce((s, c) => s + (tags[c] || []).length, 0); if (!n) return '';
@@ -2067,6 +2122,133 @@ function bindPreview() {
   $('#pvFit').onclick = () => { S.pvFit = S.pvFit === false; renderPage(); };
   $('#pvMark').onchange = e => { S.pvMark = e.target.checked; wrap.classList.toggle('mk', e.target.checked); };
 }
+/* ---------- この端末に保存（IndexedDB）と切り替え ---------- */
+const DB = {
+  db: null, _op: null,
+  open() {
+    if (this.db) return Promise.resolve(); if (this._op) return this._op;
+    this._op = new Promise((ok, ng) => {
+      const q = indexedDB.open('checksheet-app', 1);
+      q.onupgradeneeded = () => q.result.createObjectStore('kv');
+      q.onsuccess = () => { const db = q.result; db.onclose = () => { if (this.db === db) this.db = null; }; db.onversionchange = () => { try { db.close(); } catch (e) { } if (this.db === db) this.db = null; }; this.db = db; ok(); };
+      q.onerror = () => ng(q.error); q.onblocked = () => ng(new Error('blocked'));
+    }).finally(() => { this._op = null; });
+    return this._op;
+  },
+  // iPhoneのSafariは裏に回すと接続が切れることがある → 失敗したら一度だけつなぎ直す
+  async tx(mode, fn) {
+    for (let k = 0; k < 2; k++) {
+      try {
+        await this.open();
+        return await new Promise((ok, ng) => {
+          const t = this.db.transaction('kv', mode); const r = fn(t.objectStore('kv')); let out;
+          if (r) r.onsuccess = () => { out = r.result; };
+          t.oncomplete = () => ok(out); t.onerror = () => ng(t.error); t.onabort = () => ng(t.error || new Error('abort'));
+          setTimeout(() => ng(new Error('保存先の応答がありません')), 10000);
+        });
+      } catch (e) { try { this.db && this.db.close(); } catch (x) { } this.db = null; if (k) throw e; }
+    }
+  },
+  get(k) { return this.tx('readonly', s => s.get(k)); },
+  put(k, v) { return this.tx('readwrite', s => s.put(v, k)); },
+  del(k) { return this.tx('readwrite', s => s.delete(k)); },
+};
+const LIB = { list: [], id: null };
+const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+const curDoc = () => { const d = S.cb && S.cb.docCell(); return d ? String(d.value || '').trim() : ''; };
+const docBase = s => String(s || '').normalize('NFKC').trim().replace(/[-－]\s*\d+\s*$/, '');
+const libCur = () => LIB.list.find(x => x.id === LIB.id) || null;
+const toBuf = b => b instanceof ArrayBuffer ? b : b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength);
+const fmtTime = t => { if (!t) return ''; const d = new Date(t); return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`; };
+async function libIndex() { try { LIB.list = (await DB.get('index')) || []; } catch (e) { console.error(e); LIB.list = []; } return LIB.list; }
+async function libSaveIndex() { await DB.put('index', LIB.list); }
+
+let persistH = null;
+function persistOps() {
+  if (!LIB.id) return; clearTimeout(persistH);
+  persistH = setTimeout(async () => {
+    try {
+      await DB.put('ops:' + LIB.id, JSON.parse(JSON.stringify(S.ops)));
+      const e = libCur(); if (e) { e.opsN = S.ops.length; e.updatedAt = Date.now(); e.doc = curDoc() || e.doc; await libSaveIndex(); }
+      S.unsaved = false;
+    } catch (err) { console.error(err); if (!S.unsaved) toast('この端末への保存に失敗しました。Excelに保存しておいてください'); S.unsaved = true; }
+  }, 250);
+}
+// 新しく開いたExcelを保存（同じ文書番号のものがあれば置き換えるか聞く）
+async function libAdopt(buf) {
+  const doc = curDoc(); const base = docBase(doc);
+  const same = base ? LIB.list.find(x => docBase(x.doc) === base) : LIB.list.find(x => x.fileName === S.fileName);
+  let id = newId(), name = S.fileName;
+  if (same) {
+    const r = await modal({ title: '同じチェックシートが保存されています', body: `<p>「<b>${esc(same.name)}</b>」（${esc(same.doc || same.fileName)}）がこの端末に保存されています。</p><p>今開いたExcel（${esc(doc || S.fileName)}）をどうしますか？</p>${same.opsN ? `<p class="err">置き換えると、保存してある変更 ${same.opsN} 件は消えます（Excelに保存していない分）。</p>` : ''}`, buttons: [{ label: '別に追加する', value: 'add' }, '|', { label: 'やめる', value: null }, { label: '置き換える（最新にする）', value: 'rep', cls: 'pri' }] });
+    if (!r.v) return false;
+    if (r.v === 'rep') { id = same.id; name = same.name; }
+  }
+  await DB.put('file:' + id, { orig: buf, fileName: S.fileName });
+  await DB.put('ops:' + id, []);
+  const e = { id, name, fileName: S.fileName, doc, opsN: 0, updatedAt: Date.now(), openedAt: Date.now() };
+  const i = LIB.list.findIndex(x => x.id === id); if (i >= 0) LIB.list[i] = { ...LIB.list[i], ...e }; else LIB.list.unshift(e);
+  await libSaveIndex(); LIB.id = id; await DB.put('active', id);
+  try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (x) { }
+  return true;
+}
+async function libOpen(id) {
+  busy(true); await tick();
+  try {
+    const f = await DB.get('file:' + id); if (!f || !f.orig) throw new Error('保存データが見つかりません');
+    const ops = (await DB.get('ops:' + id)) || [];
+    S.orig = f.orig; S.fileName = f.fileName || ''; S.ops = ops; S.ai = null; S.pageKey = null; S.backTo = null;
+    await rebuild(); LIB.id = id; await DB.put('active', id);
+    const e = libCur(); if (e) { e.openedAt = Date.now(); e.doc = curDoc() || e.doc; await libSaveIndex(); }
+    S.view = 'home'; busy(false); render(); scrollTo(0, 0); return true;
+  } catch (err) { console.error(err); busy(false); toast('開けませんでした：' + err.message); return false; }
+}
+// Excelに保存したら、その版をこの端末の最新にする
+async function libCommit(bytes) {
+  if (!LIB.id) return;
+  const buf = toBuf(bytes);
+  await DB.put('file:' + LIB.id, { orig: buf, fileName: S.fileName });
+  await DB.put('ops:' + LIB.id, []);
+  S.orig = buf; S.ops = []; await rebuild();
+  const e = libCur(); if (e) { e.opsN = 0; e.doc = curDoc() || e.doc; e.updatedAt = e.savedAt = Date.now(); await libSaveIndex(); }
+}
+function libRowsHtml(sel) {
+  return LIB.list.map(x => `<div class="lib${x.id === sel ? ' cur' : ''}"><button class="row libo" data-id="${esc(x.id)}"><span class="t"><b>${esc(x.name)}</b>${x.id === sel ? ' <span class="badge lo">表示中</span>' : ''}<small>${esc(x.doc || x.fileName || '')}　${x.opsN ? `<span style="color:var(--red);font-weight:700">未保存の変更 ${x.opsN}件</span>` : '変更なし'}${x.savedAt ? `　Excel保存 ${esc(fmtTime(x.savedAt))}` : ''}</small></span></button><button class="ghost ic libm" data-id="${esc(x.id)}" aria-label="名前の変更・削除"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></button></div>`).join('');
+}
+async function libMenu(id) {
+  const e = LIB.list.find(x => x.id === id); if (!e) return;
+  const r = await modal({ title: e.name, body: fld('表示する名前', 'name', e.name, false) + `<p class="meta">${esc(e.doc || '')}　元のファイル：${esc(e.fileName || '')}</p>`, buttons: [{ label: 'この端末から削除', value: 'del', cls: 'danger' }, '|', { label: 'やめる', value: null }, { label: '名前を保存', value: 'ok', cls: 'pri' }] });
+  if (r.v === 'ok' && r.data.name.trim()) { e.name = r.data.name.trim(); await libSaveIndex(); toast('名前を変えました'); }
+  if (r.v === 'del') {
+    if (!(await ask('削除', `「${e.name}」をこの端末から削除します。${e.opsN ? `Excelに保存していない変更 ${e.opsN} 件も消えます。` : ''}元のExcelファイルは消えません。`, '削除する', 'danger'))) return;
+    await DB.del('file:' + id); await DB.del('ops:' + id); LIB.list = LIB.list.filter(x => x.id !== id); await libSaveIndex();
+    if (LIB.id === id) { LIB.id = null; await DB.del('active'); S.orig = null; S.ops = []; S.view = 'start'; }
+    toast('削除しました');
+  }
+}
+async function libDialog() {
+  await libIndex();
+  let pick = null;
+  const bind = () => {
+    const b = $('#dlgB');
+    for (const x of b.querySelectorAll('.libo')) x.onclick = () => { pick = { open: x.dataset.id }; $('#dlg').close(); };
+    for (const x of b.querySelectorAll('.libm')) x.onclick = () => { pick = { menu: x.dataset.id }; $('#dlg').close(); };
+    $('#libNew').onclick = () => { pick = { neu: 1 }; $('#dlg').close(); };
+  };
+  const pr = modal({ title: 'チェックシートを切り替える', body: `<div class="list">${libRowsHtml(LIB.id) || '<p class="meta" style="padding:12px">保存してあるチェックシートはありません</p>'}</div><button class="add" id="libNew">＋ 新しいExcelを開く</button><p class="meta">開いたExcelと変更は、この端末（このブラウザ）に自動で保存されます。</p>`, buttons: ['|', { label: '閉じる', value: null }] });
+  bind(); await pr;
+  if (!pick) return;
+  if (pick.open) { if (pick.open !== LIB.id) await libOpen(pick.open); else { S.view = 'home'; render(); } return; }
+  if (pick.menu) { await libMenu(pick.menu); render(); return libDialog(); }
+  if (pick.neu) { S.view = 'start'; render(); $('#file').click(); }
+}
+async function libBoot() {
+  try {
+    await libIndex(); const a = await DB.get('active');
+    if (a && LIB.list.some(x => x.id === a) && await libOpen(a)) return;
+  } catch (e) { console.error(e); }
+  renderStart();
+}
 
 /* ---------- 保存 ---------- */
 const KIND = { '文言修正': '文言修正', '追加': 'チェック項目追加', '変更': 'チェック項目変更', '削除': 'チェック項目削除', 'ページ追加': 'ページ追加', 'ページ削除': 'ページ削除', 'ページ名変更': 'ページ名変更' };
@@ -2085,7 +2267,7 @@ function revEntries() {
 }
 async function save() {
   const ents = revEntries(); const R = S.cb.revisionInfo(); const dc = S.cb.docCell();
-  const body = (dc ? `<div class="rev"><label style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="doc" checked style="width:22px;height:22px"> 文書番号を更新する（今：${esc(dc.value)}）</label>${fld('新しい文書番号（全ページのヘッダーに反映）', 'docno', XLS.CheckBook.nextDocNo(dc.value), false)}</div>` : '') + (R ? `<label style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="rev" checked style="width:22px;height:22px"> 改訂履歴に追記する（サブNo. ${esc(R.nextSub)}）</label>` + fld('作成者', 'author', store.get('author'), false) + ents.map((e, i) => `<div class="rev"><b>${esc(e.proc)}</b>　<span class="meta">${esc(e.page)}</span>${fld('変更理由', 'reason' + i, '', false)}${fld('変更内容', 'content' + i, e.content, false)}</div>`).join('') : '<p class="meta">「改訂履歴」シートが見つからないため、履歴の追記はしません。</p>') + fld('ファイル名', 'fname', `${S.fileName}_${today.replace(/\./g, '')}.xlsx`.replace(/_(\d{8})_(\d{8})\.xlsx$/, '_$2.xlsx'), false);
+  const body = (dc ? `<div class="rev"><label style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="doc" checked style="width:22px;height:22px"> 文書番号を更新する（今：${esc(dc.value)}）</label>${fld('新しい文書番号（全ページのヘッダーに反映）', 'docno', XLS.CheckBook.nextDocNo(dc.value), false)}</div>` : '') + (R ? `<label style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="rev" checked style="width:22px;height:22px"> 改訂履歴に追記する（サブNo. ${esc(R.nextSub)}）</label>` + fld('作成者', 'author', store.get('author'), false) + ents.map((e, i) => `<div class="rev"><b>${esc(e.proc)}</b>　<span class="meta">${esc(e.page)}</span>${fld('変更理由', 'reason' + i, '', false)}${fld('変更内容', 'content' + i, e.content, false)}</div>`).join('') : '<p class="meta">「改訂履歴」シートが見つからないため、履歴の追記はしません。</p>') + `<label style="display:flex;gap:8px;align-items:center;margin-top:12px"><input type="checkbox" name="commit" checked style="width:22px;height:22px"> 保存したExcelを、この端末の最新版にする<br><small class="meta">（「元に戻す」の履歴はリセットされます）</small></label>` + fld('ファイル名', 'fname', `${S.fileName}_${today.replace(/\./g, '')}.xlsx`.replace(/_(\d{8})_(\d{8})\.xlsx$/, '_$2.xlsx'), false);
   const r = await modal({ title: 'Excelに保存', body, buttons: ['|', { label: 'やめる', value: null }, { label: '保存する', value: 'ok', cls: 'pri' }] });
   if (r.v !== 'ok') return;
   const d = r.data; if (d.author != null) store.set('author', d.author);
@@ -2101,17 +2283,18 @@ async function save() {
     const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     await rebuild();
     busy(false);
-    await deliver(blob, name);
+    const okd = await deliver(blob, name);
+    if (okd && d.commit && LIB.id) { busy(true); await tick(); try { await libCommit(bytes); toast('保存しました。この版をこの端末の最新にしました'); } catch (e) { console.error(e); } busy(false); render(); }
   } catch (e) { busy(false); console.error(e); toast('保存できませんでした：' + e.message); }
 }
 let DL = null;
 async function deliver(blob, name) {
   if (DL) {
-    try { await DL.save({ filename: name, data: blob }); toast('保存しました'); return; }
-    catch (e) { if (e && e.code === 'declined') { toast('保存をやめました'); return; } if (e && e.code === 'host_unavailable') { toast('このアプリでは保存できません。ブラウザかPCで開いてください'); return; } }
+    try { await DL.save({ filename: name, data: blob }); toast('保存しました'); return true; }
+    catch (e) { if (e && e.code === 'declined') { toast('保存をやめました'); return false; } if (e && e.code === 'host_unavailable') { toast('このアプリでは保存できません。ブラウザかPCで開いてください'); return false; } }
   }
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 30000); toast('保存しました（ダウンロード）');
+  setTimeout(() => URL.revokeObjectURL(a.href), 30000); toast('保存しました（ダウンロード）'); return true;
 }
 
 /* ---------- 起動 ---------- */
@@ -2119,8 +2302,9 @@ $('#back').onclick = () => { if (S.view === 'page' && S.backTo === 'ai' && S.ai)
 $('#undo').onclick = undo;
 $('#menuBtn').onclick = () => pageMenu();
 $('#saveBtn').onclick = save;
-window.addEventListener('beforeunload', e => { if (S.ops.length) { e.preventDefault(); e.returnValue = ''; } });
-renderStart();
+$('#swBtn').onclick = () => libDialog();
+window.addEventListener('beforeunload', e => { if (S.ops.length && (S.unsaved || !LIB.id)) { e.preventDefault(); e.returnValue = ''; } });
+libBoot();
 if (window.claude && window.claude.use) window.claude.use('downloads').then(d => { DL = d; }).catch(() => { });
 }
 </script>
