@@ -198,6 +198,9 @@ header .sw{display:flex;align-items:center;gap:4px;color:var(--pri);padding:0 10
 .ord .hdl{width:44px;min-height:56px;display:grid;place-items:center;font-size:26px;color:var(--sub);cursor:grab;touch-action:none;user-select:none;border-left:1px solid var(--line)}
 .ord.drag{position:fixed;z-index:50;box-shadow:0 8px 24px rgb(0 0 0/.25);opacity:.95;margin:0}
 .ordph{border:2px dashed var(--pri);border-radius:12px;margin:8px 0;background:var(--lo-bg)}
+.tblc{background:var(--paper);border:1.5px dashed var(--lo-bd);border-radius:12px;padding:10px 12px;margin-top:10px}
+.tblc .h{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:16px}
+.tblc .acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
 .card.flash{outline:3px solid var(--pri);outline-offset:2px}
 .err{color:var(--hi-tx);background:var(--hi-bg);border-radius:10px;padding:10px 12px;font-size:14px}
 </style>
@@ -757,6 +760,30 @@ class Book {
     const after = kids(rb, 'brk').find(x => +x.getAttribute('id') > id); rb.insertBefore(b, after || null);
     rb.setAttribute('count', kids(rb, 'brk').length); rb.setAttribute('manualBreakCount', kids(rb, 'brk').length); this.touch(sh.path);
   }
+  // このツールで入れた簡易表（シートの名前定義 _CS_TBL_n で場所を覚えておく。Excelで行を足しても位置が追従する）
+  sheetTables(sh) {
+    const idx = this.sheets.indexOf(sh); const out = [];
+    for (const d of all(this.wb.documentElement, 'definedName')) {
+      if (!/^_CS_TBL_\d+$/.test(d.getAttribute('name') || '') || +d.getAttribute('localSheetId') !== idx) continue;
+      const m = /!\$?([A-Z]+)\$?(\d+):\$?([A-Z]+)\$?(\d+)\s*$/.exec(txt(d)); if (!m) continue;
+      const g = pRange(m[1] + m[2] + ':' + m[3] + m[4]); if (g) out.push({ name: d.getAttribute('name'), ...g });
+    }
+    return out.sort((a, b) => a.r1 - b.r1);
+  }
+  addTableName(sh, g) {
+    const idx = this.sheets.indexOf(sh); let dn = kid(this.wb.documentElement, 'definedNames');
+    if (!dn) { dn = mk(this.wb, 'definedNames'); const after = kid(this.wb.documentElement, 'sheets'); after.parentNode.insertBefore(dn, after.nextSibling); }
+    const used = new Set(kids(dn, 'definedName').filter(d => +d.getAttribute('localSheetId') === idx).map(d => d.getAttribute('name')));
+    let k = 1; while (used.has('_CS_TBL_' + k)) k++;
+    const d = mk(this.wb, 'definedName'); d.setAttribute('name', '_CS_TBL_' + k); d.setAttribute('localSheetId', idx); d.setAttribute('hidden', '1');
+    d.appendChild(this.wb.createTextNode(quoteName(sh.name) + '!' + aRange(g).replace(/([A-Z]+)(\d+)/g, '$$$1$$$2'))); dn.appendChild(d); this.touch(this.wbPath);
+    return '_CS_TBL_' + k;
+  }
+  removeTableName(sh, name) {
+    const idx = this.sheets.indexOf(sh); const dn = kid(this.wb.documentElement, 'definedNames'); if (!dn) return;
+    for (const d of kids(dn, 'definedName')) if (d.getAttribute('name') === name && +d.getAttribute('localSheetId') === idx) dn.removeChild(d);
+    if (!kids(dn).length) dn.parentNode.removeChild(dn); this.touch(this.wbPath);
+  }
   rowBreaks(sh) { const rb = kid(sh.doc.documentElement, 'rowBreaks'); return rb ? kids(rb, 'brk').map(b => +b.getAttribute('id')) : []; }
 
   /* ---- 保存 ---- */
@@ -881,7 +908,9 @@ class CheckBook {
       if (!C.proc) { let best = 0, bt = 0; for (const [c, k] of Object.entries(cnt)) if (+c !== C.no && k.t > bt && k.t > k.n) { bt = k.t; best = +c; } if (best) C.proc = best; }
     }
     let cur = null;
-    for (let r = p.hdr + 1; r <= p.end; r++) {
+    p.tables = b.sheetTables(sh).filter(t => t.r1 > p.hdr && t.r1 <= p.end);
+    const stopAt = p.tables.length ? p.tables[0].r1 : p.end + 1;
+    for (let r = p.hdr + 1; r < stopAt; r++) {
       const no = C.no ? b.val(sh, r, C.no) : '';
       const it = b.val(sh, r, C.item);
       const inItemMerge = (() => { const g = b.mergeAt(sh, r, C.item); return g && g.r1 < r; })();
@@ -894,7 +923,7 @@ class CheckBook {
     // 最後の項目の後ろの空き行（書式だけある行）
     p.blank = [];
     const last = p.items.length ? p.items[p.items.length - 1].r2 : p.hdr;
-    for (let r = last + 1; r <= p.end; r++) { if ([C.no, C.item, C.std].some(c => c && b.val(sh, r, c) !== '')) break; if (b.rows(sh).get(r) && kids(b.rows(sh).get(r), 'c').length) p.blank.push(r); else break; }
+    for (let r = last + 1; r < stopAt; r++) { if ([C.no, C.item, C.std].some(c => c && b.val(sh, r, c) !== '')) break; if (b.rows(sh).get(r) && kids(b.rows(sh).get(r), 'c').length) p.blank.push(r); else break; }
   }
   _maxCol(sh) { let m = 1; for (const row of this.b.rows(sh).values()) for (const c of kids(row, 'c')) m = Math.max(m, pRef(c.getAttribute('r')).c); return m; }
   _memoCols() {
@@ -1065,6 +1094,50 @@ class CheckBook {
     return ns.pages[0];
   }
   // 列見出しと行数を指定して、ヘッダー（客先・文書番号・ページ番号・タイトル）付きの表ページを作る
+  // 今のページの、チェック項目の下に簡易表を入れる（列幅は変えず、見出しの数に合わせてセルを結合）
+  addInlineTable(p, title, headers, nRows) {
+    const b = this.b, sh = p.sheet, C = p.cols; if (!C) throw new Error('チェック項目の表がないページです');
+    headers = headers.map(h => String(h).trim()).filter(Boolean); nRows = Math.max(1, Math.min(100, nRows | 0));
+    const cs = Object.values(C).filter(Boolean); const c1 = Math.min(...cs), c2 = Math.max(...cs, b.printArea(sh) ? Math.min(b.printArea(sh).c2, Math.max(...cs)) : 0);
+    const m = c2 - c1 + 1, k = headers.length; if (k > m) throw new Error(`このページの表は${m}列なので、見出しは${m}個までです`);
+    const st = (r, c) => { const el = b.cellEl(sh, r, c); return el ? el.getAttribute('s') : null; };
+    const r0 = p.items.length ? p.items[0].r1 : p.hdr + 1;
+    const sHead = st(p.hdr, C.item), sBody = st(r0, C.item), sNoH = C.no ? st(p.hdr, C.no) || sHead : sHead, sNo = C.no ? st(r0, C.no) || sBody : sBody;
+    const sTitle = p.title ? st(p.title.r, p.title.c) : null;
+    // 見出しごとの列の割り当て：列幅をなるべく均等に
+    const cw = b.colWidths(sh); const w = c => cw[c] ? cw[c].w : 9; const isNo = h => /^(No\.?|NO\.?|№|番号)$/i.test(h.normalize('NFKC'));
+    const spans = []; let c = c1;
+    for (let i = 0; i < k; i++) {
+      const left = k - i; const restW = (() => { let t = 0; for (let x = c; x <= c2; x++) t += w(x); return t; })();
+      const target = isNo(headers[i]) ? 0 : restW / left; let e = c, acc = w(c);
+      while (e < c2 - (left - 1) && acc < target * 0.85) { e++; acc += w(e); }
+      if (i === k - 1) e = c2; spans.push([c, e]); c = e + 1;
+    }
+    // 入れる位置：最後の項目（後ろの空き行も含む）の下。ページの最後まで埋まっているときはページ区切りも下げる
+    const lastItem = p.items.length ? p.items[p.items.length - 1].r2 : p.hdr;
+    const lastRow = p.blank && p.blank.length ? Math.max(lastItem, p.blank[p.blank.length - 1]) : lastItem;
+    const at = lastRow + 1, n = nRows + 3; const pa = b.printArea(sh); const atEnd = at > p.end;
+    b.shiftRows(sh, at, n);
+    if (atEnd) {
+      const rb = kid(sh.doc.documentElement, 'rowBreaks'); if (rb) for (const x of kids(rb, 'brk')) if (+x.getAttribute('id') === p.end) x.setAttribute('id', p.end + n);
+      if (pa && pa.r2 === p.end) b.setPrintArea(sh, { ...pa, r2: p.end + n });
+    }
+    const put = (r, i, v, s) => { const [a, z] = spans[i]; b.set(sh, r, a, v, { keepNum: false, ...(s ? { style: s } : {}) }); for (let x = a + 1; x <= z; x++) b.set(sh, r, x, '', s ? { style: s } : {}); if (z > a) this._mergeAdd(sh, { r1: r, c1: a, r2: r, c2: z }); };
+    const tr = at + 1, hr = at + 2;
+    b.set(sh, tr, c1, '■ ' + title, { keepNum: false, ...(sTitle ? { style: sTitle } : {}) }); for (let x = c1 + 1; x <= c2; x++) b.set(sh, tr, x, '', sTitle ? { style: sTitle } : {}); this._mergeAdd(sh, { r1: tr, c1, r2: tr, c2 });
+    headers.forEach((h, i) => put(hr, i, h, isNo(h) ? sNoH : sHead));
+    for (let j = 1; j <= nRows; j++) headers.forEach((h, i) => put(hr + j, i, isNo(h) ? j : '', isNo(h) ? sNo : sBody));
+    const ht = (r, v) => { const row = b.rows(sh).get(r); if (row) { row.setAttribute('ht', v); row.setAttribute('customHeight', '1'); } };
+    ht(at, '9'); ht(tr, '24'); ht(hr, '21'); for (let j = 1; j <= nRows; j++) ht(hr + j, '21');
+    b.addTableName(sh, { r1: at, c1, r2: hr + nRows, c2 });
+    this.analyze();
+    return this._samePage(p);
+  }
+  deleteInlineTable(p, name) {
+    const b = this.b, sh = p.sheet; const t = b.sheetTables(sh).find(x => x.name === name); if (!t) throw new Error('表が見つかりません');
+    b.removeTableName(sh, name); b.shiftRows(sh, t.r1, -(t.r2 - t.r1 + 1));
+    this.analyze(); return this._samePage(p);
+  }
   createTablePage(tpl, pos, title, headers, nRows) {
     const b = this.b;
     headers = headers.map(h => String(h).trim()).filter(Boolean); nRows = Math.max(1, Math.min(300, nRows | 0));
@@ -1307,6 +1380,8 @@ function apply(op, replay) {
     case 'order': applyOrder(op); break;
     case 'xfer': res = applyXfer(op); break;
     case 'dels': res = applyDels(op); break;
+    case 'addInline': res = cb.addInlineTable(p, op.title, op.headers, op.rows); break;
+    case 'delInline': res = cb.deleteInlineTable(p, op.name); break;
     case 'cell': { const sh = b.sheet(op.sheet); b.set(sh, op.r, op.c, op.v, { keepNum: true }); if (sh.memoCol && op.memo) b.set(sh, op.r, sh.memoCol, today + ' 変更', { keepNum: false }); cb.analyze(); break; }
     case 'row': { const sh = b.sheet(op.sheet); if (op.n > 0) b.shiftRows(sh, op.at, 1, op.tpl); else b.shiftRows(sh, op.at, -1); cb.analyze(); break; }
   }
@@ -1396,7 +1471,7 @@ function renderPage() {
       html += `<button class="card${isToday ? ' chg' : ''}${S.sel && S.sel.has(i) ? ' sel' : ''}" data-i="${i}"${S.sel ? ` aria-pressed="${S.sel.has(i)}"` : ''}>${S.sel ? `<span class="ck" aria-hidden="true">${S.sel.has(i) ? '✓' : ''}</span>` : ''}<span class="n${sec ? ' sec' : ''}">${sec ? '見' : esc(o.no)}</span>${o.proc && (o.procTop || i === 0) ? `<span class="proc">${esc(o.proc)}</span>` : ''}<span class="it">${esc(o.item) || '<span style="color:var(--sub)">（空欄）</span>'}</span>${o.std ? `<span class="std">${esc(o.std)}</span>` : ''}${o.memo ? `<span class="memo${isToday ? ' today' : ''}">${esc(o.memo)}</span>` : ''}</button>`;
     });
     if (!p.items.length) html += `<p class="meta" style="text-align:center;padding:24px 0">まだ項目がありません。下のボタンから追加してください。</p>`;
-    html += `</div><button class="add" id="addEnd">＋ 最後に項目を追加</button>`;
+    html += `</div><button class="add" id="addEnd">＋ 最後に項目を追加</button>` + inlineTablesHtml(p) + `<button class="add" id="addTbl">＋ このページに簡易表を入れる（測定記録・IOチェックなど）</button>`;
   } else if (S.mode === 'preview') html += renderPreview(p); else html += gridHtml(p);
   $('#main').innerHTML = html;
   if ($('#ckPage')) $('#ckPage').onclick = () => openAi(p);
@@ -1406,8 +1481,8 @@ function renderPage() {
     if ($('#selOn')) $('#selOn').onclick = () => { S.sel = new Set(); S.selKey = key(p); renderPage(); };
     bindSel(p);
     if (S.flash != null) { const c = document.querySelector(`.card[data-i="${S.flash}"]`); S.flash = null; if (c) { c.classList.add('flash'); setTimeout(() => c.scrollIntoView({ block: 'center' }), 0); } }
-    $('#addEnd').onclick = () => addItem(p, p.items.length - 1);
-  } else if (S.mode === 'preview') bindPreview(); else bindGrid(p);
+    $('#addEnd').onclick = () => addItem(p, p.items.length - 1); bindInlineTables(p);
+  } else if (S.mode === 'preview') bindPreview(); else { bindGrid(p); if (S.gridRow) { const th = document.querySelector(`.g th.rh[data-r="${S.gridRow}"]`); S.gridRow = null; if (th) setTimeout(() => { th.scrollIntoView({ block: 'start' }); th.closest('.gridwrap').scrollTop = Math.max(0, th.offsetTop - 40); }, 0); } }
 }
 
 /* ---- 項目編集 ---- */
@@ -2462,8 +2537,43 @@ function bindDrag() {
   };
 }
 
+/* ---- ページの中に簡易表を入れる ---- */
+function inlineTablesHtml(p) {
+  if (!p.tables || !p.tables.length) return '';
+  const b = S.bk, sh = p.sheet;
+  return p.tables.map(t => {
+    const title = String(b.val(sh, t.r1 + 1, t.c1) || '').replace(/^■\s*/, '');
+    const heads = []; for (let c = t.c1; c <= t.c2; c++) { const v = b.val(sh, t.r1 + 2, c); if (v) heads.push(v); }
+    const n = t.r2 - t.r1 - 2;
+    return `<div class="tblc"><div class="h"><span class="badge lo">簡易表</span><b>${esc(title || '（名前なし）')}</b><small class="meta">${n}行</small></div><div class="meta">${heads.map(esc).join('｜')}</div><div class="acts"><button class="sm" data-tg="${t.r1}">表で入力・編集</button><button class="sm danger" data-td="${esc(t.name)}">表を消す</button></div></div>`;
+  }).join('');
+}
+function bindInlineTables(p) {
+  for (const b of document.querySelectorAll('[data-tg]')) b.onclick = () => { S.mode = 'grid'; S.gridRow = +b.dataset.tg; renderPage(); };
+  for (const b of document.querySelectorAll('[data-td]')) b.onclick = async () => { if (!(await ask('簡易表を消す', 'この簡易表を、入っている値ごと消します。', '消す', 'danger'))) return; await run({ t: 'delInline', key: key(p), name: b.dataset.td }, { kind: '簡易表削除' }); toast('簡易表を消しました'); };
+  if ($('#addTbl')) $('#addTbl').onclick = () => inlineTableDialog(p);
+}
+async function inlineTableDialog(p) {
+  const C = p.cols; const cs = Object.values(C).filter(Boolean); const m = Math.max(...cs) - Math.min(...cs) + 1;
+  const presets = { 測定記録: 'No\n測定箇所\n基準値\n実測値\n確認', IOチェック: 'No\n名称\n機器番号\n入力\n出力\n確認', 部品・製番記録: 'No\n部品名\n品番\n製番・ロット\n確認', トルク記録: 'No\n締付箇所\n規定トルク\n実測\n確認' };
+  const body = `<label class="f">ひな形</label><div class="chips" id="tblPre">${Object.keys(presets).map(k => `<button type="button" class="sm" data-pre="${esc(k)}">${esc(k)}</button>`).join('')}</div>
+  ${fld('表の名前（表の上に「■ 名前」と入ります）', 'title', '測定記録', false)}
+  ${fld(`列の見出し（1行に1つ。このページは${m}列なので${m}個まで）`, 'heads', presets['測定記録'])}
+  <label class="f" for="f_rows">行数</label><input type="text" inputmode="numeric" id="f_rows" name="rows" value="5">
+  <p class="meta">チェック項目のいちばん下に入ります。列の幅は変えず、見出しの数に合わせてセルをつなげます。「No」列には1から番号が入ります。表を入れたあとも、チェック項目の追加は表の上に入ります。ページが長くなると、印刷が2枚になることがあります（プレビューで確認できます）。</p>`;
+  const pr = modal({ title: 'このページに簡易表を入れる', body, buttons: ['|', { label: 'やめる', value: null }, { label: '入れる', value: 'ok', cls: 'pri' }] });
+  for (const b of document.querySelectorAll('[data-pre]')) b.onclick = () => { $('#f_heads').value = presets[b.dataset.pre]; $('#f_title').value = b.dataset.pre; };
+  const r = await pr; if (r.v !== 'ok') return;
+  const heads = (r.data.heads || '').split(/\r?\n|[,、]/).map(x => x.trim()).filter(Boolean); const rows = parseInt((r.data.rows || '').normalize('NFKC'), 10);
+  if (!heads.length) { toast('列の見出しを1つ以上入れてください'); return; }
+  if (heads.length > m) { toast(`見出しは${m}個までです`); return; }
+  if (!(rows > 0)) { toast('行数を数字で入れてください'); return; }
+  await run({ t: 'addInline', key: key(p), title: (r.data.title || '').trim() || '記録', headers: heads, rows: Math.min(rows, 100) }, { kind: '簡易表追加' });
+  toast('簡易表を入れました');
+}
+
 /* ---------- 保存 ---------- */
-const KIND = { '移動': 'チェック項目移動', 'ページ順番変更': 'ページ順番変更', '文言修正': '文言修正', '追加': 'チェック項目追加', '変更': 'チェック項目変更', '削除': 'チェック項目削除', 'ページ追加': 'ページ追加', 'ページ削除': 'ページ削除', 'ページ名変更': 'ページ名変更' };
+const KIND = { '簡易表追加': '簡易表追加', '簡易表削除': '簡易表削除', '移動': 'チェック項目移動', 'ページ順番変更': 'ページ順番変更', '文言修正': '文言修正', '追加': 'チェック項目追加', '変更': 'チェック項目変更', '削除': 'チェック項目削除', 'ページ追加': 'ページ追加', 'ページ削除': 'ページ削除', 'ページ名変更': 'ページ名変更' };
 function revEntries() {
   const m = new Map();
   for (const o of S.ops) {
