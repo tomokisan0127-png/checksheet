@@ -242,6 +242,28 @@ details.bfd{margin-top:6px;border:1px dashed var(--line);border-radius:10px;padd
 details.bfd summary{font-size:14px;color:var(--pri);font-weight:700}
 details.bfp{border:1px solid var(--line);border-radius:12px;padding:0 12px;margin:8px 0}
 details.bfp summary{gap:6px;flex-wrap:wrap}
+.pvimg{position:absolute;object-fit:fill;pointer-events:none}
+.figc .fthumb{display:block;max-width:100%;max-height:220px;margin-top:8px;border:1px solid var(--line);border-radius:8px;background:#fff}
+.addrow{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.addrow .add{margin:0;display:flex;flex-direction:column;justify-content:center;line-height:1.3;padding:8px}.addrow .add small{font-weight:400;font-size:12px;color:var(--sub)}
+.figstart{display:grid;gap:10px;padding:20px 0}.figstart button{min-height:60px;font-size:18px}
+.ftools{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0;align-items:center}
+.ftools button{min-height:40px;padding:0 10px;font-size:14px}
+.ftools button[aria-pressed=true]{background:var(--pri);border-color:var(--pri);color:#fff}
+.ftools .sw span{display:inline-block;width:14px;height:14px;border-radius:50%;border:1px solid #888;margin-right:4px;vertical-align:-2px}
+.fsep{width:1px;height:28px;background:var(--line);margin:0 2px}
+.cvwrap{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#f0f2f5;margin-top:6px}
+.cvwrap canvas{display:block;width:100%;height:auto;touch-action:none;background:#fff}
+.figout{margin-top:14px;padding:10px 12px}.figout input[type=text]{width:100%;min-height:48px;border:1.5px solid var(--line);border-radius:10px;padding:0 12px;font-size:16px}
+.fopt{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:8px}.fopt>span{font-weight:700;font-size:14px;min-width:3em}
+.twrap{overflow-x:auto;margin-top:6px}
+table.ted{border-collapse:collapse;width:100%;min-width:480px;table-layout:fixed}
+table.ted th{padding:2px}table.ted th input{width:100%;min-height:34px;text-align:center;border:1px solid var(--line);border-radius:6px;font-size:14px}
+table.ted td{border:1.5px solid #333;padding:0;vertical-align:top;background:#fff}
+table.ted td.th{background:#ccf2ff;font-weight:700}
+table.ted td.tsel{outline:3px solid var(--pri);outline-offset:-3px;background:var(--lo-bg)}
+table.ted textarea{width:100%;border:0;resize:none;padding:6px;font-size:15px;background:transparent;min-height:40px;overflow:hidden;display:block}
+table.ted .tv{padding:6px;min-height:40px;white-space:pre-wrap;font-size:15px;cursor:pointer}
+.tprev{border:1px solid var(--line);border-radius:10px;padding:8px;background:#fff}.tprev img{width:100%;display:block}
 .card.flash{outline:3px solid var(--pri);outline-offset:2px}
 .err{color:var(--hi-tx);background:var(--hi-bg);border-radius:10px;padding:10px 12px;font-size:14px}
 </style>
@@ -429,7 +451,7 @@ class Book {
       this._normSheet(sh);
     }
     // drawings / comments を先読み
-    for (const sh of this.sheets) if (!sh.chart) for (const r of this._sheetRels(sh)) { const t = r.getAttribute('Type'); if (/(drawing|vmlDrawing|comments)$/.test(t) && r.getAttribute('TargetMode') !== 'External') await get(relPath(sh.path, r.getAttribute('Target'))); }
+    for (const sh of this.sheets) if (!sh.chart) for (const r of this._sheetRels(sh)) { const t = r.getAttribute('Type'); if (/(drawing|vmlDrawing|comments)$/.test(t) && r.getAttribute('TargetMode') !== 'External') { const dp = relPath(sh.path, r.getAttribute('Target')); await get(dp); if (/\/drawing$/.test(t)) await get(relsOf(dp)); } }
     for (const r of kids(this.wbRels.documentElement)) if (/calcChain$/.test(r.getAttribute('Type'))) this._calcChain = r;
   }
   _sheetRels(sh) { return sh.rels ? kids(sh.rels.documentElement, 'Relationship') : []; }
@@ -638,7 +660,7 @@ class Book {
   }
 
   /* ---- シート複製・削除 ---- */
-  _newName(prefix, ext, used) { let i = 1; while (this.zip.file(`${prefix}${i}.${ext}`) || used.has(`${prefix}${i}.${ext}`) || this.parts[`${prefix}${i}.${ext}`] || (this._binCopies || []).some(x => x[1] === `${prefix}${i}.${ext}`)) i++; const p = `${prefix}${i}.${ext}`; used.add(p); return p; }
+  _newName(prefix, ext, used) { let i = 1; while (this.zip.file(`${prefix}${i}.${ext}`) || used.has(`${prefix}${i}.${ext}`) || this.parts[`${prefix}${i}.${ext}`] || (this._binCopies || []).some(x => x[1] === `${prefix}${i}.${ext}`) || (this._media || []).some(x => x[0] === `${prefix}${i}.${ext}`)) i++; const p = `${prefix}${i}.${ext}`; used.add(p); return p; }
   _ctOverride(path) { return kids(this.ct.documentElement, 'Override').find(o => o.getAttribute('PartName') === '/' + path); }
   _addCt(path, type) { if (!type || this._ctOverride(path)) return; const o = this.ct.createElementNS(this.ct.documentElement.namespaceURI, 'Override'); o.setAttribute('PartName', '/' + path); o.setAttribute('ContentType', type); this.ct.documentElement.appendChild(o); this.touch('[Content_Types].xml'); }
   _ctType(path) { const o = this._ctOverride(path); if (o) return o.getAttribute('ContentType'); return null; }
@@ -805,25 +827,82 @@ class Book {
   sheetTables(sh) {
     const idx = this.sheets.indexOf(sh); const out = [];
     for (const d of all(this.wb.documentElement, 'definedName')) {
-      if (!/^_CS_TBL_\d+$/.test(d.getAttribute('name') || '') || +d.getAttribute('localSheetId') !== idx) continue;
+      if (!/^_CS_(TBL|FIG)_\d+$/.test(d.getAttribute('name') || '') || +d.getAttribute('localSheetId') !== idx) continue;
       const m = /!\$?([A-Z]+)\$?(\d+):\$?([A-Z]+)\$?(\d+)\s*$/.exec(txt(d)); if (!m) continue;
-      const g = pRange(m[1] + m[2] + ':' + m[3] + m[4]); if (g) out.push({ name: d.getAttribute('name'), ...g });
+      const g = pRange(m[1] + m[2] + ':' + m[3] + m[4]); if (g) out.push({ name: d.getAttribute('name'), kind: /_FIG_/.test(d.getAttribute('name')) ? 'fig' : 'tbl', ...g });
     }
     return out.sort((a, b) => a.r1 - b.r1);
   }
-  addTableName(sh, g) {
+  addTableName(sh, g, pre = '_CS_TBL_') {
     const idx = this.sheets.indexOf(sh); let dn = kid(this.wb.documentElement, 'definedNames');
     if (!dn) { dn = mk(this.wb, 'definedNames'); const after = kid(this.wb.documentElement, 'sheets'); after.parentNode.insertBefore(dn, after.nextSibling); }
     const used = new Set(kids(dn, 'definedName').filter(d => +d.getAttribute('localSheetId') === idx).map(d => d.getAttribute('name')));
-    let k = 1; while (used.has('_CS_TBL_' + k)) k++;
-    const d = mk(this.wb, 'definedName'); d.setAttribute('name', '_CS_TBL_' + k); d.setAttribute('localSheetId', idx); d.setAttribute('hidden', '1');
+    let k = 1; while (used.has(pre + k)) k++;
+    const d = mk(this.wb, 'definedName'); d.setAttribute('name', pre + k); d.setAttribute('localSheetId', idx); d.setAttribute('hidden', '1');
     d.appendChild(this.wb.createTextNode(quoteName(sh.name) + '!' + aRange(g).replace(/([A-Z]+)(\d+)/g, '$$$1$$$2'))); dn.appendChild(d); this.touch(this.wbPath);
-    return '_CS_TBL_' + k;
+    return pre + k;
   }
   removeTableName(sh, name) {
     const idx = this.sheets.indexOf(sh); const dn = kid(this.wb.documentElement, 'definedNames'); if (!dn) return;
     for (const d of kids(dn, 'definedName')) if (d.getAttribute('name') === name && +d.getAttribute('localSheetId') === idx) dn.removeChild(d);
     if (!kids(dn).length) dn.parentNode.removeChild(dn); this.touch(this.wbPath);
+  }
+  /* ---- 画像（図） ---- */
+  _drawingOf(sh, create) {
+    const rel = this._sheetRels(sh).find(r => /\/drawing$/.test(r.getAttribute('Type')));
+    if (rel) { const p = relPath(sh.path, rel.getAttribute('Target')); return { path: p, doc: this.parts[p], rels: this.parts[relsOf(p)] || null }; }
+    if (!create) return null;
+    const used = new Set(); const p = this._newName('xl/drawings/drawing', 'xml', used);
+    const doc = parse('<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"/>');
+    this._putPart(p, doc); this._addCt(p, 'application/vnd.openxmlformats-officedocument.drawing+xml');
+    if (!sh.rels) { sh.rels = parse(`<Relationships xmlns="${NS_PR}"/>`); this._putPart(sh.relsPath, sh.rels); }
+    const ids = new Set(kids(sh.rels.documentElement).map(r => r.getAttribute('Id'))); let rid; for (let i = 1; ; i++) if (!ids.has('rId' + i)) { rid = 'rId' + i; break; }
+    const r = sh.rels.createElementNS(NS_PR, 'Relationship'); r.setAttribute('Id', rid); r.setAttribute('Type', 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing'); r.setAttribute('Target', '../drawings/' + p.split('/').pop()); sh.rels.documentElement.appendChild(r); this.touch(sh.relsPath);
+    const root = sh.doc.documentElement; const el = mk(sh.doc, 'drawing'); el.setAttributeNS(NS_R, 'r:id', rid);
+    const order = ['legacyDrawing', 'legacyDrawingHF', 'drawingHF', 'picture', 'oleObjects', 'controls', 'webPublishItems', 'tableParts', 'extLst'];
+    root.insertBefore(el, kids(root).find(e => order.includes(ln(e))) || null); this.touch(sh.path);
+    return { path: p, doc, rels: null };
+  }
+  // 画像を貼る。g: {c1,c1o,r1,r1o,c2,c2o,r2,r2o}（0始まりの列・行とpxのずれ）、w,h: px
+  addPicture(sh, g, w, h, bytes, ext, name, descr) {
+    const D = this._drawingOf(sh, true);
+    if (!D.rels) { D.rels = parse(`<Relationships xmlns="${NS_PR}"/>`); this._putPart(relsOf(D.path), D.rels); }
+    const used = new Set(); const mp = this._newName('xl/media/image', ext, used); (this._media = this._media || []).push([mp, bytes]);
+    const ct = this.ct.documentElement; if (!kids(ct, 'Default').some(d => (d.getAttribute('Extension') || '').toLowerCase() === ext)) { const d = this.ct.createElementNS(ct.namespaceURI, 'Default'); d.setAttribute('Extension', ext); d.setAttribute('ContentType', ext === 'png' ? 'image/png' : 'image/jpeg'); ct.insertBefore(d, kids(ct)[0] || null); this.touch('[Content_Types].xml'); }
+    const ids = new Set(kids(D.rels.documentElement).map(r => r.getAttribute('Id'))); let rid; for (let i = 1; ; i++) if (!ids.has('rId' + i)) { rid = 'rId' + i; break; }
+    const r = D.rels.createElementNS(NS_PR, 'Relationship'); r.setAttribute('Id', rid); r.setAttribute('Type', 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image'); r.setAttribute('Target', '../media/' + mp.split('/').pop()); D.rels.documentElement.appendChild(r); this.touch(relsOf(D.path));
+    let maxId = 1; for (const e of all(D.doc.documentElement, 'cNvPr')) maxId = Math.max(maxId, +e.getAttribute('id') || 0);
+    const E = px => Math.round(px * 9525); const x = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;').replace(/\n/g, '&#10;');
+    const xml = `<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="${NS_R}"><xdr:twoCellAnchor editAs="oneCell"><xdr:from><xdr:col>${g.c1}</xdr:col><xdr:colOff>${E(g.c1o)}</xdr:colOff><xdr:row>${g.r1}</xdr:row><xdr:rowOff>${E(g.r1o)}</xdr:rowOff></xdr:from><xdr:to><xdr:col>${g.c2}</xdr:col><xdr:colOff>${E(g.c2o)}</xdr:colOff><xdr:row>${g.r2}</xdr:row><xdr:rowOff>${E(g.r2o)}</xdr:rowOff></xdr:to><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="${maxId + 1}" name="${x(name)}" descr="${x(descr || '')}"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip r:embed="${rid}"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${E(w)}" cy="${E(h)}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:twoCellAnchor></xdr:wsDr>`;
+    const frag = parse(xml).documentElement.firstChild;
+    D.doc.documentElement.appendChild(D.doc.importNode ? D.doc.importNode(frag, true) : frag.cloneNode(true)); this.touch(D.path);
+  }
+  // シートの画像の一覧（プレビュー用）
+  sheetPictures(sh) {
+    const D = this._drawingOf(sh, false); if (!D || !D.doc) return [];
+    const rmap = {}; if (D.rels) for (const r of kids(D.rels.documentElement)) rmap[r.getAttribute('Id')] = r.getAttribute('TargetMode') === 'External' ? null : relPath(D.path, r.getAttribute('Target'));
+    const out = []; const num = (el, n) => +txt(kid(el, n) || { textContent: 0 }) || 0;
+    for (const anc of [...all(D.doc.documentElement, 'twoCellAnchor'), ...all(D.doc.documentElement, 'oneCellAnchor')]) {
+      const pic = kid(anc, 'pic'); if (!pic) continue; const blip = all(pic, 'blip')[0]; if (!blip) continue;
+      const rid = blip.getAttributeNS(NS_R, 'embed') || blip.getAttribute('r:embed'); const media = rmap[rid]; if (!media) continue;
+      const f = kid(anc, 'from'), t = kid(anc, 'to'), ext = kid(anc, 'ext') || all(pic, 'ext').find(x => x.getAttribute('cx')); const nv = all(pic, 'cNvPr')[0];
+      out.push({ name: nv ? nv.getAttribute('name') : '', descr: nv ? nv.getAttribute('descr') || '' : '', media, from: { c: num(f, 'col'), co: num(f, 'colOff') / 9525, r: num(f, 'row'), ro: num(f, 'rowOff') / 9525 }, to: t ? { c: num(t, 'col'), co: num(t, 'colOff') / 9525, r: num(t, 'row'), ro: num(t, 'rowOff') / 9525 } : null, ext: ext ? { w: +ext.getAttribute('cx') / 9525, h: +ext.getAttribute('cy') / 9525 } : null });
+    }
+    return out;
+  }
+  removePicture(sh, name) {
+    const D = this._drawingOf(sh, false); if (!D || !D.doc) return;
+    for (const anc of [...all(D.doc.documentElement, 'twoCellAnchor'), ...all(D.doc.documentElement, 'oneCellAnchor')]) { const nv = all(anc, 'cNvPr')[0]; if (nv && nv.getAttribute('name') === name) { anc.parentNode.removeChild(anc); this.touch(D.path); } }
+  }
+  async mediaBytes(path) { const m = (this._media || []).find(x => x[0] === path); if (m) return m[1]; const f = this.zip.file(path); return f ? f.async('uint8array') : null; }
+  // 使われなくなった画像の参照を片付ける（保存の前に）
+  _cleanMedia() {
+    for (const sh of this.sheets) { const D = sh.chart ? null : this._drawingOf(sh, false); if (!D || !D.doc || !D.rels) continue;
+      const used = new Set(all(D.doc.documentElement, 'blip').map(b => b.getAttributeNS(NS_R, 'embed') || b.getAttribute('r:embed')));
+      for (const r of kids(D.rels.documentElement)) if (/\/image$/.test(r.getAttribute('Type')) && !used.has(r.getAttribute('Id'))) { r.parentNode.removeChild(r); this.touch(relsOf(D.path)); } }
+    const refs = new Set(); for (const p in this.parts) { const d = this.parts[p]; if (!d || !/_rels\/.*\.rels$/.test(p)) continue; for (const r of kids(d.documentElement)) if (r.getAttribute('TargetMode') !== 'External') refs.add(relPath(p.replace(/_rels\/(.*)\.rels$/, '$1'), r.getAttribute('Target'))); }
+    for (const [a, b] of this._pendingRelCopy || []) { const d = this.parts[a]; if (d) for (const r of kids(d.documentElement)) refs.add(relPath(b.replace(/_rels\/(.*)\.rels$/, '$1'), r.getAttribute('Target'))); }
+    this._media = (this._media || []).filter(x => refs.has(x[0]));
   }
   rowBreaks(sh) { const rb = kid(sh.doc.documentElement, 'rowBreaks'); return rb ? kids(rb, 'brk').map(b => +b.getAttribute('id')) : []; }
 
@@ -832,6 +911,7 @@ class Book {
     const z = this.zip;
     for (const [a, b] of this._binCopies || []) { const f = z.file(a); if (f) z.file(b, await f.async('uint8array')); }
     for (const [a, b] of this._pendingRelCopy || []) { if (this.parts[a]) z.file(b, ser(this.parts[a])); else { const f = z.file(a); if (f) z.file(b, await f.async('string')); } }
+    this._cleanMedia(); for (const [p, bytes] of this._media || []) z.file(p, bytes);
     // calcChain 削除・再計算フラグ
     if (this._calcChain) {
       const p = relPath(this.wbPath, this._calcChain.getAttribute('Target'));
@@ -1174,6 +1254,46 @@ class CheckBook {
     this.analyze();
     return this._samePage(p);
   }
+  // ページの中に図（画像）を入れる。fig: {w,h(画像のpx), pct(幅%), align:'left'|'center', bytes, ext, title, descr}
+  addFigure(p, fig, atRow) {
+    const b = this.b, sh = p.sheet, C = p.cols;
+    const cs = C ? Object.values(C).filter(Boolean) : []; const pa = b.printArea(sh);
+    const c1 = cs.length ? Math.min(...cs) : (pa ? pa.c1 : 1), c2 = cs.length ? Math.max(...cs) : (pa ? pa.c2 : 8);
+    const cw = b.colWidths(sh); const dW = 8.43; const px = c => { const x = cw[c]; const w = x ? x.w : dW; return Math.round(w * 7 + 5); };
+    const totalW = (() => { let t = 0; for (let c = c1; c <= c2; c++) t += px(c); return t; })();
+    const W = Math.max(40, Math.round(totalW * 0.97 * Math.min(1, (fig.pct || 100) / 100))); const H = Math.round(W * fig.h / fig.w);
+    const blocks = b.sheetTables(sh).filter(t => t.r1 > (p.hdr || p.start) && t.r1 <= p.end);
+    let at = atRow;
+    if (!at) {
+      const lastItem = p.items && p.items.length ? p.items[p.items.length - 1].r2 : (p.hdr || p.start);
+      let lastRow = p.blank && p.blank.length ? Math.max(lastItem, p.blank[p.blank.length - 1]) : lastItem;
+      if (!C) { lastRow = p.start; for (let r = p.start; r <= p.end; r++) { const row = b.rows(sh).get(r); if (row && kids(row, 'c').some(c => b.val(sh, r, pRef(c.getAttribute('r')).c) !== '')) lastRow = r; } }
+      for (const t of blocks) lastRow = Math.max(lastRow, t.r2);
+      at = lastRow + 1;
+    }
+    const RH = 20, n = Math.max(1, Math.ceil((H + 6) / RH)); const atEnd = at > p.end; const total = n + 1;
+    b.shiftRows(sh, at, total);
+    if (atEnd) {
+      const rb = kid(sh.doc.documentElement, 'rowBreaks'); if (rb) for (const x of kids(rb, 'brk')) if (+x.getAttribute('id') === p.end) x.setAttribute('id', p.end + total);
+      if (pa && pa.r2 === p.end) b.setPrintArea(sh, { ...pa, r2: p.end + total });
+    }
+    const ht = (r, v) => { let row = b.rows(sh).get(r); if (!row) { b.set(sh, r, c1, ''); row = b.rows(sh).get(r); } if (row) { row.setAttribute('ht', v); row.setAttribute('customHeight', '1'); } };
+    ht(at, '6'); for (let k = 1; k <= n; k++) ht(at + k, String(RH * 0.75));
+    // 横位置
+    let left = fig.align === 'center' ? Math.round((totalW - W) / 2) : 0;
+    let c = c1; while (c < c2 && left >= px(c)) { left -= px(c); c++; }
+    let right = left + W, ce = c; while (ce < c2 + 20 && right > px(ce)) { right -= px(ce); ce++; }
+    const top = 3, r1 = at + 1; let bottom = top + H, re = r1; while (bottom > RH) { bottom -= RH; re++; }
+    b.addPicture(sh, { c1: c - 1, c1o: left, r1: r1 - 1, r1o: top, c2: ce - 1, c2o: right, r2: re - 1, r2o: bottom }, W, H, fig.bytes, fig.ext, fig.name, fig.descr);
+    b.addTableName(sh, { r1: at, c1, r2: at + n, c2 }, '_CS_FIG_');
+    this.analyze(); return this._samePage(p);
+  }
+  deleteFigure(p, name) {
+    const b = this.b, sh = p.sheet; const t = b.sheetTables(sh).find(x => x.name === name); if (!t) throw new Error('図が見つかりません');
+    for (const pic of b.sheetPictures(sh)) if (pic.from.r + 1 >= t.r1 && pic.from.r + 1 <= t.r2) b.removePicture(sh, pic.name);
+    b.removeTableName(sh, name); b.shiftRows(sh, t.r1, -(t.r2 - t.r1 + 1));
+    this.analyze(); return this._samePage(p);
+  }
   deleteInlineTable(p, name) {
     const b = this.b, sh = p.sheet; const t = b.sheetTables(sh).find(x => x.name === name); if (!t) throw new Error('表が見つかりません');
     b.removeTableName(sh, name); b.shiftRows(sh, t.r1, -(t.r2 - t.r1 + 1));
@@ -1423,6 +1543,8 @@ function apply(op, replay) {
     case 'dels': res = applyDels(op); break;
     case 'addInline': res = cb.addInlineTable(p, op.title, op.headers, op.rows); break;
     case 'delInline': res = cb.deleteInlineTable(p, op.name); break;
+    case 'addFig': case 'repFig': res = applyFig(op, p); break;
+    case 'delFig': res = cb.deleteFigure(p, op.name); break;
     case 'cell': { const sh = b.sheet(op.sheet); b.set(sh, op.r, op.c, op.v, { keepNum: true }); if (sh.memoCol && op.memo) b.set(sh, op.r, sh.memoCol, today + ' 変更', { keepNum: false }); cb.analyze(); break; }
     case 'row': { const sh = b.sheet(op.sheet); if (op.n > 0) b.shiftRows(sh, op.at, 1, op.tpl); else b.shiftRows(sh, op.at, -1); cb.analyze(); break; }
   }
@@ -1455,15 +1577,15 @@ async function undo() {
 
 /* ---------- 画面 ---------- */
 function setHeader(p) {
-  $('#back').hidden = S.view !== 'page' && S.view !== 'ai' && S.view !== 'order' && S.view !== 'tidy'; $('#back').textContent = S.view === 'page' && S.backTo === 'ai' ? '‹ チェックへ' : S.view === 'page' && S.backTo === 'tidy' ? '‹ そろえるへ' : '‹ 戻る'; $('#menuBtn').hidden = S.view !== 'page'; $('#swBtn').hidden = S.view !== 'home';
+  $('#back').hidden = S.view !== 'page' && S.view !== 'ai' && S.view !== 'order' && S.view !== 'tidy' && S.view !== 'fig'; $('#back').textContent = S.view === 'page' && S.backTo === 'ai' ? '‹ チェックへ' : S.view === 'page' && S.backTo === 'tidy' ? '‹ そろえるへ' : '‹ 戻る'; $('#menuBtn').hidden = S.view !== 'page'; $('#swBtn').hidden = S.view !== 'home';
   $('#undo').disabled = !S.ops.length; $('#undo').hidden = S.view === 'start';
   const h = $('#ttl');
   if (S.view === 'page' && p) h.innerHTML = `${esc(S.cb.title(p))}<span class="pg">${esc(label(p))}・シート「${esc(p.sheet.name.trim())}」</span>`;
-  else h.textContent = S.view === 'start' ? 'チェックシート編集' : S.view === 'ai' || S.view === 'order' || S.view === 'tidy' ? h.textContent : ((libCur() || {}).name || S.fileName);
+  else h.textContent = S.view === 'start' ? 'チェックシート編集' : S.view === 'ai' || S.view === 'order' || S.view === 'tidy' || S.view === 'fig' ? h.textContent : ((libCur() || {}).name || S.fileName);
   $('#bar').classList.toggle('hide', S.view === 'start');
   const n = S.ops.length; $('#cnt').innerHTML = n ? `変更 <b>${n}</b> 件 <button class="sm" id="chgBtn">変更点を見る</button>` : '変更はまだありません'; $('#saveBtn').disabled = !n; if ($('#chgBtn')) $('#chgBtn').onclick = showChanges;
 }
-function render() { if (S.view === 'start') return renderStart(); if (S.view === 'order' && S.order) return renderOrder(); if (S.view === 'tidy' && S.tidy) return renderTidy(); if (S.view === 'ai') return renderAi(); if (S.view === 'page' && pageByKey(S.pageKey)) return renderPage(); S.view = 'home'; renderHome(); }
+function render() { if (S.view === 'start') return renderStart(); if (S.view === 'order' && S.order) return renderOrder(); if (S.view === 'tidy' && S.tidy) return renderTidy(); if (S.view === 'fig' && S.fig) return renderFig(); if (S.view === 'ai') return renderAi(); if (S.view === 'page' && pageByKey(S.pageKey)) return renderPage(); S.view = 'home'; renderHome(); }
 const changedKeys = () => { const s = new Set(); for (const o of S.ops) { if (o.edits) for (const x of o.edits) s.add(x.key.split('#')[0]); if (o.key) s.add(o.key.split('#')[0]); if (o.sheet) s.add(o.sheet); if (o.after) s.add(o.after.split('#')[0]); if (o.src) s.add(o.src.split('#')[0]); if (o.dst) s.add(o.dst.split('#')[0]); if (o.order) for (const n of o.order) s.add(n); } return s; };
 
 function renderHome() {
@@ -1513,7 +1635,7 @@ function renderPage() {
       html += `<button class="card${isToday ? ' chg' : ''}${S.sel && S.sel.has(i) ? ' sel' : ''}" data-i="${i}"${S.sel ? ` aria-pressed="${S.sel.has(i)}"` : ''}>${S.sel ? `<span class="ck" aria-hidden="true">${S.sel.has(i) ? '✓' : ''}</span>` : ''}<span class="n${sec ? ' sec' : ''}">${sec ? '見' : esc(o.no)}</span>${o.proc && (o.procTop || i === 0) ? `<span class="proc">${esc(o.proc)}</span>` : ''}<span class="it">${esc(o.item) || '<span style="color:var(--sub)">（空欄）</span>'}</span>${o.std ? `<span class="std">${esc(o.std)}</span>` : ''}${o.memo ? `<span class="memo${isToday ? ' today' : ''}">${esc(o.memo)}</span>` : ''}</button>`;
     });
     if (!p.items.length) html += `<p class="meta" style="text-align:center;padding:24px 0">まだ項目がありません。下のボタンから追加してください。</p>`;
-    html += `</div><button class="add" id="addEnd">＋ 最後に項目を追加</button>` + inlineTablesHtml(p) + `<button class="add" id="addTbl">＋ このページに簡易表を入れる（測定記録・IOチェックなど）</button>`;
+    html += `</div><button class="add" id="addEnd">＋ 最後に項目を追加</button>` + inlineTablesHtml(p) + `<div class="addrow"><button class="add" id="addFig">＋ 図・表を入れる<small>写真・図面に書き込み／自由な表</small></button><button class="add" id="addTbl">＋ 簡易表（セル）<small>列の幅はページに合わせる</small></button></div>`;
   } else if (S.mode === 'preview') html += renderPreview(p); else html += gridHtml(p);
   $('#main').innerHTML = html;
   if ($('#ckPage')) $('#ckPage').onclick = () => openAi(p);
@@ -2300,7 +2422,18 @@ function previewHtml(p, B = S.bk, mark = null) {
     }
     h += '</tr>';
   }
-  return { html: h + '</tbody></table>', W };
+  // 画像（図・写真）を重ねる
+  const colX = {}; { let xx = 0; for (const { c, w } of cols) { colX[c] = xx; xx += w; } }
+  const rowY = {}; { let yy = 0; for (let r = r1; r <= r2 + 1; r++) { rowY[r] = yy; const row = b.rows(sh).get(r); if (row && row.getAttribute('hidden') === '1') continue; yy += Math.round(+(row && row.getAttribute('ht') || dH) * 4 / 3); } }
+  let imgs = ''; const bkTag = B === S.bk ? 'cur' : 'orig';
+  for (const pc of b.sheetPictures(sh)) {
+    const R = pc.from.r + 1, C = pc.from.c + 1; if (R < r1 || R > r2 || C < c1 || C > c2 || colX[C] == null) continue;
+    const x = colX[C] + pc.from.co, y = rowY[R] + pc.from.ro; let w = pc.ext && pc.ext.w, hh = pc.ext && pc.ext.h;
+    if ((!w || !hh) && pc.to) { const C2 = pc.to.c + 1, R2 = pc.to.r + 1; w = (colX[C2] != null ? colX[C2] : W) + pc.to.co - x; hh = (rowY[R2] != null ? rowY[R2] : rowY[r2 + 1]) + pc.to.ro - y; }
+    if (!(w > 0 && hh > 0)) continue;
+    imgs += `<img class="pvimg" alt="" data-media="${esc(pc.media)}" data-bk="${bkTag}" style="left:${x.toFixed(1)}px;top:${y.toFixed(1)}px;width:${w.toFixed(1)}px;height:${hh.toFixed(1)}px">`;
+  }
+  return { html: `<div class="pvbox" style="position:relative;width:${W}px">` + h + '</tbody></table>' + imgs + '</div>', W };
 }
 function renderPreview(p) {
   const fit = S.pvFit !== false, mark = S.pvMark !== false, md = S.pvMode || 'after';
@@ -2321,7 +2454,7 @@ function renderPreview(p) {
 }
 function bindPreview() {
   const fitNow = () => { for (const paper of document.querySelectorAll('.pvpaper')) { const wrap = paper.parentElement; const W = +paper.dataset.w; const t = paper.firstElementChild; const s = S.pvFit !== false ? Math.min(1, (wrap.clientWidth - 16) / W) : 1; t.style.transform = `scale(${s})`; t.style.transformOrigin = '0 0'; paper.style.width = Math.ceil(W * s) + 'px'; paper.style.height = Math.ceil(t.offsetHeight * s) + 'px'; } };
-  fitNow(); window.onresize = () => { if (document.querySelector('.pvpaper')) fitNow(); };
+  fillMedia(document.getElementById('main')); fitNow(); window.onresize = () => { if (document.querySelector('.pvpaper')) fitNow(); };
   if ($('#pvFit')) $('#pvFit').onclick = () => { S.pvFit = S.pvFit === false; renderPage(); };
   if ($('#pvMark')) $('#pvMark').onchange = e => { S.pvMark = e.target.checked; renderPage(); };
   for (const b of document.querySelectorAll('[data-pm]')) b.onclick = () => { S.pvMode = b.dataset.pm; renderPage(); };
@@ -2594,6 +2727,7 @@ function inlineTablesHtml(p) {
   if (!p.tables || !p.tables.length) return '';
   const b = S.bk, sh = p.sheet;
   return p.tables.map(t => {
+    if (t.kind === 'fig') { const { pic, meta } = figThumb(p, t); return `<div class="tblc figc"><div class="h"><span class="badge lo">${meta.kind === 'table' ? '表（絵）' : '図'}</span><b>${esc(meta.title || '（名前なし）')}</b></div>${pic ? `<img class="fthumb" alt="" data-media="${esc(pic.media)}">` : ''}<div class="acts"><button class="sm" data-fe="${t.r1}">✎ 直す</button><button class="sm danger" data-fd="${esc(t.name)}">消す</button></div></div>`; }
     const title = String(b.val(sh, t.r1 + 1, t.c1) || '').replace(/^■\s*/, '');
     const heads = []; for (let c = t.c1; c <= t.c2; c++) { const v = b.val(sh, t.r1 + 2, c); if (v) heads.push(v); }
     const n = t.r2 - t.r1 - 2;
@@ -2604,6 +2738,10 @@ function bindInlineTables(p) {
   for (const b of document.querySelectorAll('[data-tg]')) b.onclick = () => { S.mode = 'grid'; S.gridRow = +b.dataset.tg; renderPage(); };
   for (const b of document.querySelectorAll('[data-td]')) b.onclick = async () => { if (!(await ask('簡易表を消す', 'この簡易表を、入っている値ごと消します。', '消す', 'danger'))) return; await run({ t: 'delInline', key: key(p), name: b.dataset.td }, { kind: '簡易表削除' }); toast('簡易表を消しました'); };
   if ($('#addTbl')) $('#addTbl').onclick = () => inlineTableDialog(p);
+  if ($('#addFig')) $('#addFig').onclick = () => openFig(p);
+  for (const b of document.querySelectorAll('[data-fe]')) b.onclick = () => { const t = p.tables.find(x => x.r1 === +b.dataset.fe); if (t) openFig(p, t); };
+  for (const b of document.querySelectorAll('[data-fd]')) b.onclick = async () => { if (!(await ask('図・表を消す', 'この図・表をページから消します。', '消す', 'danger'))) return; await run({ t: 'delFig', key: key(p), name: b.dataset.fd }, { kind: '図削除' }); toast('消しました'); };
+  fillMedia(document.getElementById('main'));
 }
 async function inlineTableDialog(p) {
   const C = p.cols; const cs = Object.values(C).filter(Boolean); const m = Math.max(...cs) - Math.min(...cs) + 1;
@@ -2923,9 +3061,287 @@ function revDiffHtml(e, i, list) {
   return `<details class="bfd"><summary>何を変えたか見る${n ? `（${n}件）` : ''}</summary>${pageChangeHtml(c, { limit: 30 })}${sum ? `<div class="acts"><button type="button" class="sm" data-rs="${i}" data-sum="${esc(e.content + '：' + sum)}">この内容を「変更内容」に書き込む</button></div>` : ''}</details>`;
 }
 function bindRevDiff() { for (const b of document.querySelectorAll('#dlgB [data-rs]')) b.onclick = () => { const t = document.getElementById('f_content' + b.dataset.rs); if (t) { t.value = b.dataset.sum; t.dispatchEvent(new Event('input')); toast('変更内容に書き込みました。必要なら短く直してください'); } }; }
+/* ---------- 図・表エディタ（絵にしてページに貼る） ---------- */
+const FIG_COLORS = [['#e53935', '赤'], ['#1e5fd6', '青'], ['#111111', '黒'], ['#f5b400', '黄'], ['#ffffff', '白']];
+const FIG_TOOLS = [['sel', '選ぶ・動かす'], ['arrow', '矢印'], ['line', '線'], ['dim', '寸法'], ['ell', '丸'], ['rect', '四角'], ['text', '文字'], ['num', '番号'], ['crop', '切り取り']];
+const NUMS = '①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳';
+const newFigId = () => 'f' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+function figBlank(kind) {
+  return { id: newFigId(), kind: kind || 'draw', title: '', pct: 100, align: 'center',
+    draw: { base: null, W: 1200, H: 800, objs: [] },
+    table: { colW: [1, 3, 2, 2], rows: [[{ v: 'No' }, { v: '項目' }, { v: '基準' }, { v: '結果' }], [{ v: '1' }, { v: '' }, { v: '' }, { v: '' }], [{ v: '2' }, { v: '' }, { v: '' }, { v: '' }], [{ v: '3' }, { v: '' }, { v: '' }, { v: '' }]], head: true, fs: 'm', rowH: 'm' } };
+}
+async function openFig(p, block) {
+  let src = null;
+  if (block) src = await figSourceOf(p, block);
+  S.fig = { key: key(p), name: block ? block.name : null, src: src || figBlank(), tool: 'arrow', color: '#e53935', lw: 2, fs: 2, sel: -1, hist: [], tsel: new Set(), crop: null };
+  if (S.fig.src.draw.base) await figLoadBase(S.fig.src.draw.base);
+  S.view = 'fig'; render(); scrollTo(0, 0);
+}
+async function figSourceOf(p, block) {
+  const pic = S.bk.sheetPictures(p.sheet).find(x => x.from.r + 1 >= block.r1 && x.from.r + 1 <= block.r2);
+  if (!pic) return null;
+  let meta = {}; try { meta = JSON.parse((pic.descr || '').replace(/^CSFIG:/, '')); } catch (e) { }
+  if (meta.id) { try { const s = await DB.get('fig:' + meta.id); if (s) return s; } catch (e) { } }
+  const src = figBlank(meta.kind || 'draw'); Object.assign(src, { id: meta.id || newFigId(), title: meta.title || '', pct: meta.pct || 100, align: meta.align || 'center' });
+  if (meta.kind === 'table' && meta.table) { src.table = meta.table; return src; }
+  // 別の端末で作った図：貼ってある絵を下絵にして、上から書き足す
+  const bytes = await S.bk.mediaBytes(pic.media); if (!bytes) return src;
+  const url = await new Promise(ok => { const r = new FileReader(); r.onload = () => ok(r.result); r.readAsDataURL(new Blob([bytes], { type: /\.png$/i.test(pic.media) ? 'image/png' : 'image/jpeg' })); });
+  src.kind = 'draw'; src.draw.base = url; const im = await loadImg(url); src.draw.W = im.naturalWidth; src.draw.H = im.naturalHeight; src.flattened = true;
+  return src;
+}
+const loadImg = url => new Promise((ok, ng) => { const im = new Image(); im.onload = () => ok(im); im.onerror = () => ng(new Error('画像を読めません')); im.src = url; });
+async function figLoadBase(url) { S.fig.img = await loadImg(url); }
+// 写真は長い辺 1600px までに縮めて JPEG に
+async function fileToBase(file) {
+  const url = URL.createObjectURL(file); try {
+    const im = await loadImg(url); const k = Math.min(1, 1600 / Math.max(im.naturalWidth, im.naturalHeight));
+    const c = document.createElement('canvas'); c.width = Math.round(im.naturalWidth * k); c.height = Math.round(im.naturalHeight * k);
+    const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); x.drawImage(im, 0, 0, c.width, c.height);
+    return { url: c.toDataURL('image/jpeg', 0.88), W: c.width, H: c.height };
+  } finally { URL.revokeObjectURL(url); }
+}
+function figPush() { const F = S.fig; F.hist.push(JSON.stringify({ draw: { ...F.src.draw }, table: F.src.table })); if (F.hist.length > 40) F.hist.shift(); }
+function figUndo() { const F = S.fig; const h = F.hist.pop(); if (!h) return; const o = JSON.parse(h); F.src.draw = o.draw; F.src.table = o.table; F.sel = -1; if (F.src.draw.base) figLoadBase(F.src.draw.base).then(renderFig); else { F.img = null; renderFig(); } }
+
+/* ---- 描画 ---- */
+function figUnit(D) { return Math.max(D.W, D.H) / 600; }
+function drawArrowHead(x, x1, y1, x2, y2, s) { const a = Math.atan2(y2 - y1, x2 - x1); x.beginPath(); x.moveTo(x2, y2); x.lineTo(x2 - s * Math.cos(a - 0.45), y2 - s * Math.sin(a - 0.45)); x.lineTo(x2 - s * Math.cos(a + 0.45), y2 - s * Math.sin(a + 0.45)); x.closePath(); x.fill(); }
+function drawObj(x, o, u) {
+  const lw = u * [0, 1.6, 2.8, 4.4][o.lw || 2]; const fs = u * [0, 11, 16, 24][o.fs || 2];
+  x.strokeStyle = o.c; x.fillStyle = o.c; x.lineWidth = lw; x.lineCap = 'round'; x.lineJoin = 'round';
+  const halo = (fn) => { if (o.c === '#ffffff' || o.c === '#f5b400') { x.save(); x.strokeStyle = 'rgba(0,0,0,.55)'; x.lineWidth = lw + u * 1.6; fn(); x.restore(); } fn(); };
+  if (o.t === 'line' || o.t === 'arrow' || o.t === 'dim') {
+    halo(() => { x.beginPath(); x.moveTo(o.x1, o.y1); x.lineTo(o.x2, o.y2); x.stroke(); });
+    const hs = lw * 3.2 + u * 4;
+    if (o.t === 'arrow') drawArrowHead(x, o.x1, o.y1, o.x2, o.y2, hs);
+    if (o.t === 'dim') { drawArrowHead(x, o.x1, o.y1, o.x2, o.y2, hs); drawArrowHead(x, o.x2, o.y2, o.x1, o.y1, hs); if (o.s) { const mx = (o.x1 + o.x2) / 2, my = (o.y1 + o.y2) / 2; labelBox(x, o.s, mx, my, fs, o.c, u, true); } }
+  } else if (o.t === 'ell') { halo(() => { x.beginPath(); x.ellipse(o.x + o.w / 2, o.y + o.h / 2, Math.abs(o.w / 2), Math.abs(o.h / 2), 0, 0, Math.PI * 2); x.stroke(); }); }
+  else if (o.t === 'rect') { halo(() => { x.strokeRect(o.x, o.y, o.w, o.h); }); }
+  else if (o.t === 'text') labelBox(x, o.s, o.x, o.y, fs, o.c, u, false);
+  else if (o.t === 'num') { const r = fs * 0.85; x.beginPath(); x.arc(o.x, o.y, r, 0, Math.PI * 2); x.fillStyle = '#fff'; x.fill(); x.lineWidth = Math.max(lw * 0.8, u * 1.4); x.strokeStyle = o.c; x.stroke(); x.fillStyle = o.c; x.font = `700 ${fs * 1.05}px "BIZ UDPゴシック","Hiragino Sans",sans-serif`; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(String(o.n), o.x, o.y + fs * 0.04); }
+}
+function labelBox(x, s, cx, cy, fs, c, u, center) {
+  x.font = `700 ${fs}px "BIZ UDPゴシック","Hiragino Sans",sans-serif`; const lines = String(s).split('\n'); const lh = fs * 1.25;
+  const w = Math.max(...lines.map(l => x.measureText(l).width)); const h = lh * lines.length; const pad = fs * 0.3;
+  const x0 = center ? cx - w / 2 : cx, y0 = center ? cy - h / 2 : cy;
+  x.fillStyle = c === '#ffffff' ? 'rgba(0,0,0,.65)' : 'rgba(255,255,255,.88)'; x.fillRect(x0 - pad, y0 - pad, w + pad * 2, h + pad * 2);
+  x.fillStyle = c; x.textAlign = 'left'; x.textBaseline = 'top'; lines.forEach((l, i) => x.fillText(l, x0, y0 + i * lh + fs * 0.08));
+}
+function objBox(o, x, u) {
+  if ('x1' in o) return { x: Math.min(o.x1, o.x2), y: Math.min(o.y1, o.y2), w: Math.abs(o.x2 - o.x1), h: Math.abs(o.y2 - o.y1) };
+  if (o.t === 'text') { const fs = u * [0, 11, 16, 24][o.fs || 2]; x.font = `700 ${fs}px sans-serif`; const ls = String(o.s).split('\n'); return { x: o.x, y: o.y, w: Math.max(...ls.map(l => x.measureText(l).width)), h: fs * 1.25 * ls.length }; }
+  if (o.t === 'num') { const r = u * [0, 11, 16, 24][o.fs || 2] * 0.85; return { x: o.x - r, y: o.y - r, w: r * 2, h: r * 2 }; }
+  return { x: Math.min(o.x, o.x + o.w), y: Math.min(o.y, o.y + o.h), w: Math.abs(o.w), h: Math.abs(o.h) };
+}
+function paintDraw(cv, D, img, opt = {}) {
+  cv.width = D.W; cv.height = D.H; const x = cv.getContext('2d'); const u = figUnit(D);
+  x.fillStyle = '#fff'; x.fillRect(0, 0, D.W, D.H); if (img) x.drawImage(img, 0, 0, D.W, D.H);
+  for (const o of D.objs) drawObj(x, o, u); if (opt.temp) drawObj(x, opt.temp, u);
+  if (opt.sel >= 0 && D.objs[opt.sel]) { const b = objBox(D.objs[opt.sel], x, u); x.save(); x.setLineDash([u * 4, u * 3]); x.strokeStyle = '#1a56b5'; x.lineWidth = u * 1.2; x.strokeRect(b.x - u * 5, b.y - u * 5, b.w + u * 10, b.h + u * 10); x.restore(); }
+  if (opt.crop) { const c = opt.crop; x.save(); x.fillStyle = 'rgba(0,0,0,.45)'; x.beginPath(); x.rect(0, 0, D.W, D.H); x.rect(c.x, c.y, c.w, c.h); x.fill('evenodd'); x.setLineDash([u * 5, u * 3]); x.strokeStyle = '#fff'; x.lineWidth = u * 1.5; x.strokeRect(c.x, c.y, c.w, c.h); x.restore(); }
+}
+function hitObj(D, px, py) {
+  const cv = document.createElement('canvas'); const x = cv.getContext('2d'); const u = figUnit(D); const tol = u * 10;
+  for (let i = D.objs.length - 1; i >= 0; i--) {
+    const o = D.objs[i];
+    if ('x1' in o) { const dx = o.x2 - o.x1, dy = o.y2 - o.y1; const L = dx * dx + dy * dy || 1; let t = ((px - o.x1) * dx + (py - o.y1) * dy) / L; t = Math.max(0, Math.min(1, t)); const qx = o.x1 + t * dx, qy = o.y1 + t * dy; if (Math.hypot(px - qx, py - qy) < tol) return i; continue; }
+    const b = objBox(o, x, u); if (px >= b.x - tol && px <= b.x + b.w + tol && py >= b.y - tol && py <= b.y + b.h + tol) return i;
+  }
+  return -1;
+}
+
+/* ---- 表を絵にする ---- */
+function tableCanvas(T) {
+  const W = 1400, fs = { s: 24, m: 28, l: 34 }[T.fs || 'm'], pad = fs * 0.35, lh = fs * 1.3;
+  const minH = { s: 1.6, m: 2.1, l: 2.8 }[T.rowH || 'm'] * fs;
+  const cols = T.colW.length; const sum = T.colW.reduce((a, b) => a + b, 0); const cw = T.colW.map(w => W * w / sum); const cx = [0]; cw.forEach((w, i) => cx.push(cx[i] + w));
+  const c = document.createElement('canvas'); const x = c.getContext('2d'); x.font = `${fs}px "BIZ UDPゴシック","Hiragino Sans",sans-serif`;
+  const wrap = (s, w) => { const out = []; for (const para of String(s || '').split('\n')) { let line = ''; for (const ch of para) { if (x.measureText(line + ch).width > w && line) { out.push(line); line = ch; } else line += ch; } out.push(line); } return out; };
+  const rows = T.rows; const rh = rows.map((r, i) => { let h = minH; r.forEach((cell, j) => { if (!cell || cell.hide) return; const cs = cell.cs || 1; const w = cx[Math.min(cols, j + cs)] - cx[j] - pad * 2; x.font = `${cell.b || (T.head && i === 0) ? 700 : 400} ${fs}px sans-serif`; const n = wrap(cell.v, w).length; if ((cell.rs || 1) === 1) h = Math.max(h, n * lh + pad * 2); }); return Math.ceil(h); });
+  const ry = [0]; rh.forEach((h, i) => ry.push(ry[i] + h));
+  c.width = W + 4; c.height = ry[rows.length] + 4; x.translate(2, 2);
+  x.fillStyle = '#fff'; x.fillRect(-2, -2, c.width, c.height);
+  rows.forEach((r, i) => r.forEach((cell, j) => {
+    if (!cell || cell.hide) return; const cs = cell.cs || 1, rs = cell.rs || 1;
+    const X = cx[j], Y = ry[i], Wc = cx[Math.min(cols, j + cs)] - X, Hc = ry[Math.min(rows.length, i + rs)] - Y;
+    const fill = cell.f || (T.head && i === 0 ? '#ccf2ff' : null); if (fill) { x.fillStyle = fill; x.fillRect(X, Y, Wc, Hc); }
+    x.strokeStyle = '#000'; x.lineWidth = 2; x.strokeRect(X, Y, Wc, Hc);
+    const bold = cell.b || (T.head && i === 0); x.font = `${bold ? 700 : 400} ${fs}px "BIZ UDPゴシック","Hiragino Sans",sans-serif`; x.fillStyle = cell.c || '#000'; x.textBaseline = 'top';
+    const lines = wrap(cell.v, Wc - pad * 2); const th = lines.length * lh; const al = cell.al || (T.head && i === 0 ? 'center' : (/^\d+$/.test(cell.v || '') ? 'center' : 'left'));
+    lines.forEach((l, k) => { const tw = x.measureText(l).width; const tx = al === 'center' ? X + (Wc - tw) / 2 : al === 'right' ? X + Wc - pad - tw : X + pad; x.fillText(l, tx, Y + (Hc - th) / 2 + k * lh + fs * 0.12); });
+  }));
+  return c;
+}
+
+/* ---- 画面 ---- */
+function renderFig() {
+  setHeader(); $('#ttl').textContent = S.fig.name ? '図・表を直す' : '図・表を作る';
+  const F = S.fig, src = F.src, D = src.draw;
+  const kt = (v, l) => `<button data-fk="${v}" aria-pressed="${src.kind === v}">${l}</button>`;
+  let h = `<div class="tabs">${kt('draw', '図（写真・図面）')}${kt('table', '表')}</div>`;
+  if (src.flattened) h += '<p class="meta">別の端末で作った図なので、貼ってある絵を下絵にして書き足す形になります（前の矢印などは動かせません）。</p>';
+  if (src.kind === 'draw') {
+    if (!D.base && !D.blank) {
+      h += `<div class="figstart"><button class="pri" id="fPhoto">📷 写真を撮る・選ぶ</button><button id="fBlank">白紙に描く</button><p class="meta">図面や現物の写真に、矢印・丸・文字・番号・寸法を書き込めます。写真は長い辺1600pxに縮めて入れます。</p></div><input type="file" id="fFile" accept="image/*" hidden>`;
+    } else {
+      h += `<div class="ftools">${FIG_TOOLS.map(([v, l]) => `<button class="sm" data-ft="${v}" aria-pressed="${F.tool === v}">${l}</button>`).join('')}</div>
+      <div class="ftools">${FIG_COLORS.map(([c, l]) => `<button class="sm sw" data-fc="${c}" aria-pressed="${F.color === c}" aria-label="${l}"><span style="background:${c}"></span>${l}</button>`).join('')}<span class="fsep"></span>${['細', '中', '太'].map((l, i) => `<button class="sm" data-fw="${i + 1}" aria-pressed="${F.lw === i + 1}">線${l}</button>`).join('')}${['小', '中', '大'].map((l, i) => `<button class="sm" data-fs="${i + 1}" aria-pressed="${F.fs === i + 1}">字${l}</button>`).join('')}</div>
+      <div class="ftools"><button class="sm" id="fUndo"${F.hist.length ? '' : ' disabled'}>↶ 元に戻す</button><button class="sm danger" id="fDel"${F.sel >= 0 ? '' : ' disabled'}>選んだものを消す</button>${F.sel >= 0 && ['text', 'dim'].includes((D.objs[F.sel] || {}).t) ? '<button class="sm" id="fEdT">文字を直す</button>' : ''}${F.crop ? '<button class="sm pri" id="fCropGo">この範囲で切り取る</button>' : ''}<button class="sm" id="fRe">${D.base ? '写真を変える' : '写真を入れる'}</button></div>
+      <div class="cvwrap"><canvas id="fCv"></canvas></div><p class="meta">${{ sel: '書いたものをタップで選び、ドラッグで動かします。', arrow: 'ドラッグで矢印を引きます（指を離した所が矢じり）。', line: 'ドラッグで線を引きます。', dim: 'ドラッグで寸法線を引くと、寸法の文字を聞きます。', ell: 'ドラッグで丸を描きます。', rect: 'ドラッグで四角を描きます。', text: '文字を置きたい所をタップします。', num: 'タップした所に①②③…と順に番号を置きます。', crop: '残したい範囲をドラッグで囲み、「この範囲で切り取る」を押します。' }[F.tool]}</p><input type="file" id="fFile" accept="image/*" hidden>`;
+    }
+  } else h += figTableEditor();
+  h += `<div class="box figout"><label class="f" for="fTitle">名前（ページには出ません。一覧での見分け用）</label><input type="text" id="fTitle" value="${esc(src.title || '')}" placeholder="例：カラーの向き、トルク記録">
+  <div class="fopt"><span>幅</span>${[100, 75, 50].map(v => `<label class="wopt"><input type="radio" name="fpct" value="${v}"${src.pct === v ? ' checked' : ''}><span>${v === 100 ? 'ページの幅' : v + '%'}</span></label>`).join('')}</div>
+  <div class="fopt"><span>位置</span>${[['center', '中央'], ['left', '左寄せ']].map(([v, l]) => `<label class="wopt"><input type="radio" name="falign" value="${v}"${src.align === v ? ' checked' : ''}><span>${l}</span></label>`).join('')}</div>
+  <p class="meta">チェック項目のいちばん下（簡易表や図があればその下）に、絵として入ります。ページが長くなったら、プレビューで印刷が2枚にならないか確かめてください。</p>
+  <div class="row2"><button class="pri" id="fGo">${F.name ? 'この内容で入れ直す' : 'このページに入れる'}</button></div></div>`;
+  $('#main').innerHTML = h;
+  bindFig();
+}
+function bindFig() {
+  const F = S.fig, src = F.src, D = src.draw;
+  for (const b of document.querySelectorAll('[data-fk]')) b.onclick = () => { src.kind = b.dataset.fk; renderFig(); };
+  $('#fTitle').oninput = e => { src.title = e.target.value; };
+  for (const r of document.querySelectorAll('[name=fpct]')) r.onchange = () => { src.pct = +r.value; };
+  for (const r of document.querySelectorAll('[name=falign]')) r.onchange = () => { src.align = r.value; };
+  $('#fGo').onclick = figInsert;
+  if ($('#fFile')) $('#fFile').onchange = async e => { const f = e.target.files[0]; if (!f) return; busy(true); try { const b = await fileToBase(f); figPush(); D.base = b.url; D.W = b.W; D.H = b.H; D.blank = false; if (!F.keepObjs) D.objs = []; await figLoadBase(b.url); src.flattened = false; } catch (err) { toast(err.message); } busy(false); renderFig(); };
+  if ($('#fPhoto')) $('#fPhoto').onclick = () => $('#fFile').click();
+  if ($('#fBlank')) $('#fBlank').onclick = () => { D.blank = true; D.base = null; F.img = null; D.W = 1200; D.H = 800; renderFig(); };
+  if ($('#fRe')) $('#fRe').onclick = () => $('#fFile').click();
+  if (src.kind === 'table') return bindTableEditor();
+  if (!$('#fCv')) return;
+  for (const b of document.querySelectorAll('[data-ft]')) b.onclick = () => { F.tool = b.dataset.ft; F.crop = null; if (F.tool !== 'sel') F.sel = -1; renderFig(); };
+  for (const b of document.querySelectorAll('[data-fc]')) b.onclick = () => { F.color = b.dataset.fc; if (F.sel >= 0) { figPush(); D.objs[F.sel].c = F.color; } renderFig(); };
+  for (const b of document.querySelectorAll('[data-fw]')) b.onclick = () => { F.lw = +b.dataset.fw; if (F.sel >= 0) { figPush(); D.objs[F.sel].lw = F.lw; } renderFig(); };
+  for (const b of document.querySelectorAll('[data-fs]')) b.onclick = () => { F.fs = +b.dataset.fs; if (F.sel >= 0) { figPush(); D.objs[F.sel].fs = F.fs; } renderFig(); };
+  $('#fUndo').onclick = figUndo;
+  $('#fDel').onclick = () => { if (F.sel < 0) return; figPush(); D.objs.splice(F.sel, 1); F.sel = -1; renderFig(); };
+  if ($('#fEdT')) $('#fEdT').onclick = async () => { const o = D.objs[F.sel]; const s = await askText(o.t === 'dim' ? '寸法の文字' : '文字', o.s || ''); if (s == null) return; figPush(); o.s = s; renderFig(); };
+  if ($('#fCropGo')) $('#fCropGo').onclick = figCrop;
+  const cv = $('#fCv'); const paint = temp => paintDraw(cv, D, F.img, { sel: F.sel, temp, crop: F.crop }); paint();
+  const pt = e => { const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) * D.W / r.width, y: (e.clientY - r.top) * D.H / r.height }; };
+  let st = null;
+  cv.onpointerdown = async e => {
+    e.preventDefault(); const p = pt(e); const base = { c: F.color, lw: F.lw, fs: F.fs };
+    if (F.tool === 'text') { const s = await askText('文字', ''); if (s) { figPush(); D.objs.push({ t: 'text', x: p.x, y: p.y, s, ...base }); F.sel = D.objs.length - 1; } renderFig(); return; }
+    if (F.tool === 'num') { figPush(); const n = D.objs.filter(o => o.t === 'num').reduce((m, o) => Math.max(m, o.n), 0) + 1; D.objs.push({ t: 'num', x: p.x, y: p.y, n, ...base }); paint(); renderFig(); return; }
+    if (F.tool === 'sel') { const i = hitObj(D, p.x, p.y); F.sel = i; if (i < 0) { renderFig(); return; } figPush(); st = { mode: 'move', p, o: JSON.parse(JSON.stringify(D.objs[i])) }; cv.setPointerCapture(e.pointerId); paint(); return; }
+    st = { mode: 'draw', p }; cv.setPointerCapture(e.pointerId);
+  };
+  cv.onpointermove = e => {
+    if (!st) return; const p = pt(e); const dx = p.x - st.p.x, dy = p.y - st.p.y;
+    if (st.mode === 'move') { const o = D.objs[F.sel], s0 = st.o; if ('x1' in o) { o.x1 = s0.x1 + dx; o.y1 = s0.y1 + dy; o.x2 = s0.x2 + dx; o.y2 = s0.y2 + dy; } else { o.x = s0.x + dx; o.y = s0.y + dy; } paint(); return; }
+    st.temp = figShape(F.tool, st.p, p, { c: F.color, lw: F.lw, fs: F.fs });
+    if (F.tool === 'crop') { F.crop = { x: Math.min(st.p.x, p.x), y: Math.min(st.p.y, p.y), w: Math.abs(dx), h: Math.abs(dy) }; paint(); } else paint(st.temp);
+  };
+  cv.onpointerup = cv.onpointercancel = async () => {
+    const s0 = st; st = null; if (!s0) return;
+    if (s0.mode === 'move') { renderFig(); return; }
+    if (F.tool === 'crop') { renderFig(); return; }
+    const o = s0.temp; if (!o) return; const b = objBox(o, cv.getContext('2d'), figUnit(D)); if (Math.max(b.w, b.h) < figUnit(D) * 6) { paint(); return; }
+    if (o.t === 'dim') { const s = await askText('寸法の文字（例：12.9mm）', ''); o.s = s || ''; }
+    figPush(); D.objs.push(o); renderFig();
+  };
+}
+function figShape(t, a, b, base) {
+  if (['arrow', 'line', 'dim'].includes(t)) return { t, x1: a.x, y1: a.y, x2: b.x, y2: b.y, ...base };
+  if (['ell', 'rect'].includes(t)) return { t, x: a.x, y: a.y, w: b.x - a.x, h: b.y - a.y, ...base };
+  return null;
+}
+async function askText(title, v) { const r = await modal({ title, body: fld('文字（改行もできます）', 'tx', v), buttons: ['|', { label: 'やめる', value: null }, { label: 'OK', value: 'ok', cls: 'pri' }] }); return r.v === 'ok' ? r.data.tx : null; }
+async function figCrop() {
+  const F = S.fig, D = F.src.draw, c = F.crop; if (!c || c.w < 10 || c.h < 10) return;
+  const cv = document.createElement('canvas'); cv.width = Math.round(c.w); cv.height = Math.round(c.h); const x = cv.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, cv.width, cv.height); if (F.img) x.drawImage(F.img, -c.x, -c.y, D.W, D.H);
+  figPush(); D.base = cv.toDataURL('image/jpeg', 0.9); D.W = cv.width; D.H = cv.height; D.blank = false;
+  for (const o of D.objs) { if ('x1' in o) { o.x1 -= c.x; o.x2 -= c.x; o.y1 -= c.y; o.y2 -= c.y; } else { o.x -= c.x; o.y -= c.y; } }
+  F.crop = null; F.tool = 'arrow'; await figLoadBase(D.base); renderFig();
+}
+
+/* ---- 表エディタ ---- */
+function figTableEditor() {
+  const F = S.fig, T = F.src.table; const nc = T.colW.length;
+  let h = `<div class="ftools"><button class="sm" id="tRowA">＋行</button><button class="sm" id="tRowD">－行</button><button class="sm" id="tColA">＋列</button><button class="sm" id="tColD">－列</button><span class="fsep"></span><button class="sm" id="tSel" aria-pressed="${!!F.tselMode}">${F.tselMode ? '✓ マスを選び中' : 'マスを選ぶ'}</button></div>`;
+  if (F.tselMode) h += `<div class="ftools"><button class="sm" id="tMerge"${F.tsel.size > 1 ? '' : ' disabled'}>結合</button><button class="sm" id="tSplit"${F.tsel.size ? '' : ' disabled'}>結合を解く</button>${[['', 'なし'], ['#ccf2ff', '水色'], ['#fff3b0', '黄'], ['#e6e6e6', '灰']].map(([c, l]) => `<button class="sm sw" data-tf="${c}"${F.tsel.size ? '' : ' disabled'}><span style="background:${c || '#fff'}"></span>${l}</button>`).join('')}<button class="sm" data-ta="left"${F.tsel.size ? '' : ' disabled'}>左</button><button class="sm" data-ta="center"${F.tsel.size ? '' : ' disabled'}>中央</button><button class="sm" data-tb="1"${F.tsel.size ? '' : ' disabled'}>太字</button></div>`;
+  h += `<div class="ftools"><label class="opt" style="min-height:40px"><input type="checkbox" id="tHead"${T.head ? ' checked' : ''}> 1行目を見出しにする</label><span class="fsep"></span>${[['s', '字小'], ['m', '字中'], ['l', '字大']].map(([v, l]) => `<button class="sm" data-tfs="${v}" aria-pressed="${T.fs === v}">${l}</button>`).join('')}${[['s', '行低'], ['m', '行中'], ['l', '行高']].map(([v, l]) => `<button class="sm" data-trh="${v}" aria-pressed="${T.rowH === v}">${l}</button>`).join('')}</div>`;
+  h += `<p class="meta">列の幅：数字が大きいほど広くなります（1〜12）。</p><div class="twrap"><table class="ted"><thead><tr>${T.colW.map((w, j) => `<th><input type="number" min="1" max="12" value="${w}" data-cw="${j}" aria-label="${j + 1}列目の幅"></th>`).join('')}</tr></thead><tbody>`;
+  const sum = T.colW.reduce((a, b) => a + b, 0);
+  T.rows.forEach((r, i) => { h += '<tr>'; r.forEach((cell, j) => { if (cell.hide) return; const sel = F.tsel.has(i + ':' + j); h += `<td${cell.cs > 1 ? ` colspan="${cell.cs}"` : ''}${cell.rs > 1 ? ` rowspan="${cell.rs}"` : ''} class="${sel ? 'tsel' : ''}${T.head && i === 0 ? ' th' : ''}" style="${cell.f ? `background:${cell.f};` : ''}" data-ij="${i}:${j}">${F.tselMode ? `<div class="tv">${esc(cell.v || '')}</div>` : `<textarea rows="1" data-ij="${i}:${j}">${esc(cell.v || '')}</textarea>`}</td>`; }); h += '</tr>'; });
+  h += `</tbody></table></div><p class="meta">表の見本（実際に入る絵）：</p><div class="tprev"><img id="tImg" alt="表の見本"></div>`;
+  return h.replace('<table class="ted">', `<table class="ted"><colgroup>${T.colW.map(w => `<col style="width:${(w / sum * 100).toFixed(1)}%">`).join('')}</colgroup>`);
+}
+function bindTableEditor() {
+  const F = S.fig, T = F.src.table; const re = () => renderFig();
+  const prev = () => { const c = tableCanvas(T); $('#tImg').src = c.toDataURL('image/png'); }; prev();
+  const nc = () => T.colW.length;
+  const normalize = () => { for (const r of T.rows) for (const c of r) { c.hide = false; } T.rows.forEach((r, i) => r.forEach((c, j) => { if (c.cs > 1 || c.rs > 1) { c.cs = Math.min(c.cs || 1, nc() - j); c.rs = Math.min(c.rs || 1, T.rows.length - i); for (let a = i; a < i + (c.rs || 1); a++) for (let b = j; b < j + (c.cs || 1); b++) if (a !== i || b !== j) T.rows[a][b].hide = true; } })); };
+  $('#tRowA').onclick = () => { figPush(); const last = T.rows[T.rows.length - 1]; T.rows.push(Array.from({ length: nc() }, (_, j) => ({ v: j === 0 && /^\d+$/.test((last[0] || {}).v || '') ? String(+last[0].v + 1) : '' }))); normalize(); re(); };
+  $('#tRowD').onclick = () => { if (T.rows.length <= 1) return; figPush(); T.rows.pop(); normalize(); re(); };
+  $('#tColA').onclick = () => { if (nc() >= 12) return; figPush(); T.colW.push(2); T.rows.forEach(r => r.push({ v: '' })); normalize(); re(); };
+  $('#tColD').onclick = () => { if (nc() <= 1) return; figPush(); T.colW.pop(); T.rows.forEach(r => r.pop()); normalize(); re(); };
+  $('#tSel').onclick = () => { F.tselMode = !F.tselMode; F.tsel = new Set(); re(); };
+  $('#tHead').onchange = e => { T.head = e.target.checked; re(); };
+  for (const b of document.querySelectorAll('[data-tfs]')) b.onclick = () => { T.fs = b.dataset.tfs; re(); };
+  for (const b of document.querySelectorAll('[data-trh]')) b.onclick = () => { T.rowH = b.dataset.trh; re(); };
+  for (const i of document.querySelectorAll('[data-cw]')) i.onchange = () => { T.colW[+i.dataset.cw] = Math.max(1, Math.min(12, +i.value || 1)); re(); };
+  for (const t of document.querySelectorAll('textarea[data-ij]')) { const fit = () => { t.style.height = 'auto'; t.style.height = t.scrollHeight + 'px'; }; fit(); t.oninput = () => { const [i, j] = t.dataset.ij.split(':').map(Number); T.rows[i][j].v = t.value; fit(); clearTimeout(t._h); t._h = setTimeout(prev, 300); }; }
+  if (F.tselMode) for (const td of document.querySelectorAll('td[data-ij]')) td.onclick = () => { const k = td.dataset.ij; F.tsel.has(k) ? F.tsel.delete(k) : F.tsel.add(k); re(); };
+  const selCells = () => [...F.tsel].map(k => k.split(':').map(Number));
+  if ($('#tMerge')) $('#tMerge').onclick = () => {
+    const s = selCells(); const i1 = Math.min(...s.map(x => x[0])), i2 = Math.max(...s.map(x => x[0] + (T.rows[x[0]][x[1]].rs || 1) - 1)), j1 = Math.min(...s.map(x => x[1])), j2 = Math.max(...s.map(x => x[1] + (T.rows[x[0]][x[1]].cs || 1) - 1));
+    figPush(); const txt2 = []; for (let a = i1; a <= i2; a++) for (let b = j1; b <= j2; b++) { const c = T.rows[a][b]; if (c.v && !c.hide) txt2.push(c.v); c.cs = 1; c.rs = 1; if (a !== i1 || b !== j1) c.v = ''; }
+    const c0 = T.rows[i1][j1]; c0.v = txt2.join('\n'); c0.cs = j2 - j1 + 1; c0.rs = i2 - i1 + 1; normalize(); F.tsel = new Set(); re();
+  };
+  if ($('#tSplit')) $('#tSplit').onclick = () => { figPush(); for (const [i, j] of selCells()) { const c = T.rows[i][j]; c.cs = 1; c.rs = 1; } normalize(); F.tsel = new Set(); re(); };
+  for (const b of document.querySelectorAll('[data-tf]')) b.onclick = () => { figPush(); for (const [i, j] of selCells()) T.rows[i][j].f = b.dataset.tf || null; re(); };
+  for (const b of document.querySelectorAll('[data-ta]')) b.onclick = () => { figPush(); for (const [i, j] of selCells()) T.rows[i][j].al = b.dataset.ta; re(); };
+  for (const b of document.querySelectorAll('[data-tb]')) b.onclick = () => { figPush(); const on = !selCells().every(([i, j]) => T.rows[i][j].b); for (const [i, j] of selCells()) T.rows[i][j].b = on; re(); };
+}
+
+/* ---- ページに入れる ---- */
+async function figInsert() {
+  const F = S.fig, src = F.src; const p = pageByKey(F.key); if (!p) { toast('ページが見つかりません'); return; }
+  let cv, ext;
+  if (src.kind === 'table') { cv = tableCanvas(src.table); ext = 'png'; }
+  else { if (!src.draw.base && !src.draw.blank) { toast('写真を選ぶか、白紙を選んでください'); return; } cv = document.createElement('canvas'); paintDraw(cv, src.draw, F.img, {}); ext = src.draw.base ? 'jpeg' : 'png'; }
+  const data = ext === 'png' ? cv.toDataURL('image/png') : cv.toDataURL('image/jpeg', 0.85);
+  const meta = { id: src.id, kind: src.kind, title: src.title || '', pct: src.pct, align: src.align }; if (src.kind === 'table') meta.table = src.table;
+  const fig = { w: cv.width, h: cv.height, pct: src.pct, align: src.align, ext, data, name: 'CS_FIG_' + src.id, descr: 'CSFIG:' + JSON.stringify(meta) };
+  try { await DB.put('fig:' + src.id, JSON.parse(JSON.stringify({ ...src, flattened: false }))); } catch (e) { console.error(e); }
+  S.view = 'page'; S.mode = 'items';
+  if (F.name) await run({ t: 'repFig', key: key(p), name: F.name, fig }, { kind: '図変更' });
+  else await run({ t: 'addFig', key: key(p), fig }, { kind: '図追加' });
+  S.fig = null; render(); toast(F.name ? '図・表を入れ直しました' : '図・表を入れました');
+}
+function b64bytes(dataUrl) { const b = atob(dataUrl.split(',')[1]); const u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; }
+function applyFig(op, p) {
+  const f = op.fig; const fig = { ...f, bytes: b64bytes(f.data) };
+  if (op.t === 'addFig') return S.cb.addFigure(p, fig);
+  const t = S.bk.sheetTables(p.sheet).find(x => x.name === op.name); if (!t) throw new Error('図が見つかりません');
+  const at = t.r1; const np = S.cb.deleteFigure(p, op.name); return S.cb.addFigure(np, fig, at);
+}
+
+/* ---- 画像の表示（ページの一覧・プレビュー） ---- */
+const MEDIA_URL = new WeakMap();
+async function mediaUrl(B, path) {
+  let m = MEDIA_URL.get(B); if (!m) { m = new Map(); MEDIA_URL.set(B, m); }
+  if (m.has(path)) return m.get(path);
+  const pr = (async () => { if (!/\.(png|jpe?g|gif|bmp)$/i.test(path)) return null; const b = await B.mediaBytes(path); if (!b) return null; return URL.createObjectURL(new Blob([b], { type: /\.png$/i.test(path) ? 'image/png' : /\.gif$/i.test(path) ? 'image/gif' : 'image/jpeg' })); })();
+  m.set(path, pr); return pr;
+}
+function fillMedia(root) {
+  for (const im of (root || document).querySelectorAll('img[data-media]')) { if (im.dataset.done) continue; im.dataset.done = 1; const B = im.dataset.bk === 'orig' && S._ob ? S._ob.bk : S.bk; mediaUrl(B, im.dataset.media).then(u => { if (u) im.src = u; else im.remove(); }); }
+}
+function figThumb(p, t) {
+  const pic = S.bk.sheetPictures(p.sheet).find(x => x.from.r + 1 >= t.r1 && x.from.r + 1 <= t.r2);
+  let meta = {}; try { meta = JSON.parse(((pic || {}).descr || '').replace(/^CSFIG:/, '')); } catch (e) { }
+  return { pic, meta };
+}
 
 /* ---------- 保存 ---------- */
-const KIND = { '簡易表追加': '簡易表追加', '簡易表削除': '簡易表削除', '移動': 'チェック項目移動', 'ページ順番変更': 'ページ順番変更', '文言修正': '文言修正', '追加': 'チェック項目追加', '変更': 'チェック項目変更', '削除': 'チェック項目削除', 'ページ追加': 'ページ追加', 'ページ削除': 'ページ削除', 'ページ名変更': 'ページ名変更' };
+const KIND = { '図追加': '図追加', '図変更': '図変更', '図削除': '図削除', '簡易表追加': '簡易表追加', '簡易表削除': '簡易表削除', '移動': 'チェック項目移動', 'ページ順番変更': 'ページ順番変更', '文言修正': '文言修正', '追加': 'チェック項目追加', '変更': 'チェック項目変更', '削除': 'チェック項目削除', 'ページ追加': 'ページ追加', 'ページ削除': 'ページ削除', 'ページ名変更': 'ページ名変更' };
 function revEntries() {
   const m = new Map();
   for (const o of S.ops) {
@@ -2977,7 +3393,7 @@ async function deliver(blob, name) {
 }
 
 /* ---------- 起動 ---------- */
-$('#back').onclick = () => { if (S.view === 'order' || S.view === 'tidy') { if (S.view === 'tidy' && S.tidy && S.tidy.cmp) { S.tidy.cmp = null; renderTidy(); return; } S.view = 'home'; render(); return; } if (S.view === 'page' && S.backTo === 'tidy' && S.tidy) { S.backTo = null; S.view = 'tidy'; render(); return; } if (S.view === 'page' && S.backTo === 'ai' && S.ai) { S.backTo = null; S.view = 'ai'; render(); return; } S.view = S.view === 'ai' && S.ai && S.ai.from ? 'page' : 'home'; if (S.view === 'page') S.pageKey = S.ai.from; render(); };
+$('#back').onclick = () => { if (S.view === 'fig') { S.fig = null; S.view = 'page'; S.mode = 'items'; render(); return; } if (S.view === 'order' || S.view === 'tidy') { if (S.view === 'tidy' && S.tidy && S.tidy.cmp) { S.tidy.cmp = null; renderTidy(); return; } S.view = 'home'; render(); return; } if (S.view === 'page' && S.backTo === 'tidy' && S.tidy) { S.backTo = null; S.view = 'tidy'; render(); return; } if (S.view === 'page' && S.backTo === 'ai' && S.ai) { S.backTo = null; S.view = 'ai'; render(); return; } S.view = S.view === 'ai' && S.ai && S.ai.from ? 'page' : 'home'; if (S.view === 'page') S.pageKey = S.ai.from; render(); };
 $('#undo').onclick = undo;
 $('#menuBtn').onclick = () => pageMenu();
 $('#saveBtn').onclick = save;
