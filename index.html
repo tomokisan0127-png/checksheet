@@ -201,6 +201,33 @@ header .sw{display:flex;align-items:center;gap:4px;color:var(--pri);padding:0 10
 .tblc{background:var(--paper);border:1.5px dashed var(--lo-bd);border-radius:12px;padding:10px 12px;margin-top:10px}
 .tblc .h{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:16px}
 .tblc .acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.prog{height:12px;background:var(--tint);border-radius:99px;overflow:hidden}.prog div{height:100%;background:var(--ok-tx);border-radius:99px}
+details.npage{background:var(--paper);border:1px solid var(--line);border-radius:12px;margin:8px 0;box-shadow:var(--shadow)}
+details.npage>summary{display:flex;align-items:center;gap:10px;padding:10px 12px;min-height:56px;list-style:none}
+details.npage>summary::-webkit-details-marker{display:none}
+details.npage>summary .t{flex:1}details.npage>summary .t small{display:block;color:var(--sub);font-size:13px}
+.mini{width:70px;height:8px;background:var(--hi-bg);border-radius:99px;overflow:hidden;flex:none}.mini span{display:block;height:100%;background:var(--ok-tx)}
+details.npage[open]{padding-bottom:8px}details.npage[open]>*:not(summary){margin-left:10px;margin-right:10px}
+.nrow{border-top:1px solid var(--line);padding:10px 0}.nrow .h{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-weight:700;font-size:14px}
+.nrow .it{white-space:pre-wrap;font-size:15px;margin:4px 0}
+.nrow textarea{width:100%;border:1.5px solid var(--line);border-radius:10px;padding:8px;font-size:16px;background:var(--paper)}
+.nrow .lbl{display:block;font-size:12px;color:var(--sub);font-weight:700;margin-top:4px}
+.sugs{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}.sugs button{min-height:40px;font-size:13px;font-weight:400;text-align:left;line-height:1.3;padding:4px 10px;white-space:pre-line}.sugs small{display:block;color:var(--sub);font-size:11px}
+.wg{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:8px 0;box-shadow:var(--shadow)}
+.wg .h{display:flex;justify-content:space-between;gap:8px;font-size:15px}
+.wopts{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.wopt{display:flex;align-items:center;gap:6px;border:1.5px solid var(--line);border-radius:10px;padding:6px 10px;cursor:pointer;min-height:44px}
+.wopt:has(input:checked){border-color:var(--pri);background:var(--lo-bg)}
+.wopt input{width:20px;height:20px;accent-color:var(--pri)}.wopt small{display:block;font-size:11px;color:var(--sub)}
+.cbad{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;max-width:40%}
+.cmp{background:var(--paper);border:1px solid var(--line);border-left-width:6px;border-radius:12px;padding:10px 12px;margin:8px 0}
+.cmp.hi{border-left-color:var(--hi-bd)}.cmp.md{border-left-color:var(--md-bd)}.cmp.lo{border-left-color:var(--lo-bd)}.cmp.ed{border-left-color:var(--ok-tx)}
+.cmp .h{display:flex;gap:8px;align-items:center;font-weight:700;font-size:14px;margin-bottom:6px}
+.cg{display:grid;grid-template-columns:1fr 1fr;gap:8px}.cg>div{background:var(--tint);border-radius:8px;padding:6px 8px;font-size:14px;white-space:pre-wrap;overflow-wrap:anywhere}
+.cg small{display:block;font-weight:700;color:var(--sub);font-size:12px}
+.cs{font-size:13px;color:var(--sub);margin-top:4px}
+.cmp del{color:var(--hi-tx);background:var(--hi-bg)}.cmp ins{color:var(--ok-tx);background:var(--ok-bg);text-decoration:none;font-weight:700}
+.cmp .acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
 .card.flash{outline:3px solid var(--pri);outline-offset:2px}
 .err{color:var(--hi-tx);background:var(--hi-bg);border-radius:10px;padding:10px 12px;font-size:14px}
 </style>
@@ -1414,15 +1441,15 @@ async function undo() {
 
 /* ---------- 画面 ---------- */
 function setHeader(p) {
-  $('#back').hidden = S.view !== 'page' && S.view !== 'ai' && S.view !== 'order'; $('#back').textContent = S.view === 'page' && S.backTo === 'ai' ? '‹ チェックへ' : '‹ 戻る'; $('#menuBtn').hidden = S.view !== 'page'; $('#swBtn').hidden = S.view !== 'home';
+  $('#back').hidden = S.view !== 'page' && S.view !== 'ai' && S.view !== 'order' && S.view !== 'tidy'; $('#back').textContent = S.view === 'page' && S.backTo === 'ai' ? '‹ チェックへ' : S.view === 'page' && S.backTo === 'tidy' ? '‹ そろえるへ' : '‹ 戻る'; $('#menuBtn').hidden = S.view !== 'page'; $('#swBtn').hidden = S.view !== 'home';
   $('#undo').disabled = !S.ops.length; $('#undo').hidden = S.view === 'start';
   const h = $('#ttl');
   if (S.view === 'page' && p) h.innerHTML = `${esc(S.cb.title(p))}<span class="pg">${esc(label(p))}・シート「${esc(p.sheet.name.trim())}」</span>`;
-  else h.textContent = S.view === 'start' ? 'チェックシート編集' : S.view === 'ai' || S.view === 'order' ? h.textContent : ((libCur() || {}).name || S.fileName);
+  else h.textContent = S.view === 'start' ? 'チェックシート編集' : S.view === 'ai' || S.view === 'order' || S.view === 'tidy' ? h.textContent : ((libCur() || {}).name || S.fileName);
   $('#bar').classList.toggle('hide', S.view === 'start');
   const n = S.ops.length; $('#cnt').innerHTML = n ? `変更 <b>${n}</b> 件` : '変更はまだありません'; $('#saveBtn').disabled = !n;
 }
-function render() { if (S.view === 'start') return renderStart(); if (S.view === 'order' && S.order) return renderOrder(); if (S.view === 'ai') return renderAi(); if (S.view === 'page' && pageByKey(S.pageKey)) return renderPage(); S.view = 'home'; renderHome(); }
+function render() { if (S.view === 'start') return renderStart(); if (S.view === 'order' && S.order) return renderOrder(); if (S.view === 'tidy' && S.tidy) return renderTidy(); if (S.view === 'ai') return renderAi(); if (S.view === 'page' && pageByKey(S.pageKey)) return renderPage(); S.view = 'home'; renderHome(); }
 const changedKeys = () => { const s = new Set(); for (const o of S.ops) { if (o.edits) for (const x of o.edits) s.add(x.key.split('#')[0]); if (o.key) s.add(o.key.split('#')[0]); if (o.sheet) s.add(o.sheet); if (o.after) s.add(o.after.split('#')[0]); if (o.src) s.add(o.src.split('#')[0]); if (o.dst) s.add(o.dst.split('#')[0]); if (o.order) for (const n of o.order) s.add(n); } return s; };
 
 function renderHome() {
@@ -1440,7 +1467,7 @@ function renderHome() {
   for (const p of cb.pages) if (!p.sheet.hidden && !numbered.includes(p)) add('その他のシート（別紙・目次など）', p);
   const q = S.q.trim().toLowerCase();
   const dc = cb.docCell();
-  let html = `<div class="top"><div><span class="meta">文書番号</span><b>${esc(dc ? dc.value : '—')}</b></div><span class="topb"><button id="aiBtn">文章・内容チェック</button><button class="pri" id="addPg">＋ ページを追加</button></span></div><input class="search" id="q" type="search" placeholder="工程名・シート名で探す" value="${esc(S.q)}">`;
+  let html = `<div class="top"><div><span class="meta">文書番号</span><b>${esc(dc ? dc.value : '—')}</b></div><span class="topb"><button id="aiBtn">文章・内容チェック</button><button id="tidyBtn">そろえる</button><button class="pri" id="addPg">＋ ページを追加</button></span></div><input class="search" id="q" type="search" placeholder="工程名・シート名で探す" value="${esc(S.q)}">`;
   for (const g of order) {
     const ps = groups[g].filter(p => !q || (cb.title(p) + ' ' + p.sheet.name).toLowerCase().includes(q)); if (!ps.length) continue;
     const gc = ps.find(p => p.cover && isNumbered(p)); const canOrd = !q && gc && groupUnits(gc.cover).length >= 2;
@@ -1451,6 +1478,7 @@ function renderHome() {
   $('#aiBtn').onclick = () => openAi(null);
   $('#q').oninput = e => { S.q = e.target.value; const pos = e.target.selectionStart; renderHome(); const n = $('#q'); n.focus(); n.setSelectionRange(pos, pos); };
   for (const b of document.querySelectorAll('.ordbtn')) b.onclick = () => openOrder(b.dataset.cover);
+  $('#tidyBtn').onclick = () => openTidy();
   for (const b of document.querySelectorAll('.row')) b.onclick = () => { S.backTo = null; S.flash = null; S.pageKey = b.dataset.k; S.view = 'page'; S.mode = pageByKey(S.pageKey).cols ? 'items' : 'grid'; render(); scrollTo(0, 0); };
 }
 
@@ -1684,7 +1712,7 @@ function autoPair(p) {
   return bs >= 0.6 ? best : null;
 }
 function pairOf(p) {
-  const pick = S.ai && S.ai.refPick ? S.ai.refPick[key(p)] : undefined;
+  const pick = S.refPick ? S.refPick[key(p)] : undefined;
   if (pick !== undefined) return pick ? refPage(pick) : null;
   return autoPair(p);
 }
@@ -1964,9 +1992,9 @@ function renderAuto(tg) {
   $('#ckBody').innerHTML = h;
   $('#refPick').onclick = () => $('#refFile').click();
   $('#refFile').onchange = e => e.target.files[0] && loadRef(e.target.files[0]);
-  if ($('#refOff')) $('#refOff').onclick = () => { S.ref = null; A.autoSig = null; renderAi(); };
-  if ($('#refSel')) $('#refSel').onchange = e => { A.refPick[A.from] = e.target.value; A.autoSig = null; renderAi(); };
-  const sig = sigOf(tg) + '|' + (R0 ? R0.name : '') + JSON.stringify(A.refPick) + S.ops.length;
+  if ($('#refOff')) $('#refOff').onclick = () => { S.ref = null; S.refPick = {}; A.autoSig = null; renderAi(); };
+  if ($('#refSel')) $('#refSel').onchange = e => { S.refPick = S.refPick || {}; S.refPick[A.from] = e.target.value; A.autoSig = null; renderAi(); };
+  const sig = sigOf(tg) + '|' + (R0 ? R0.name : '') + JSON.stringify(S.refPick || {}) + S.ops.length;
   const R = cachedR(A, 'autoR', sig, () => [...autoFindings(tg), ...compareFindings(tg)].sort((a, b) => LV_ORDER[a.lv] - LV_ORDER[b.lv]));
   showResults(R, { empty: '自動チェックで見つかった点はありませんでした。', stay: true });
 }
@@ -1979,9 +2007,9 @@ async function loadRef(f) {
     const dc = cb.docCell(); const nm = f.name.replace(/\.[^.]+$/, '');
     const lb = (/L\d{2,3}/i.exec(nm) || /L\d{2,3}/i.exec(dc ? dc.value : '') || [nm.slice(0, 12)])[0].toUpperCase();
     if (!cb.pages.filter(okPage).length) throw new Error('チェック項目のページが見つかりません');
-    S.ref = { name: f.name, label: lb, cb }; S.ai.refPick = {}; S.ai.autoSig = null; toast(lb + ' と比べます');
+    S.ref = { name: f.name, label: lb, cb }; S.refPick = {}; if (S.ai) S.ai.autoSig = null; toast(lb + ' と比べます');
   } catch (e) { console.error(e); toast('読み込めませんでした：' + e.message); }
-  busy(false); renderAi();
+  busy(false); if (S.view === 'tidy') renderTidy(); else renderAi();
 }
 
 function renderAiTab(tg) {
@@ -2571,6 +2599,191 @@ async function inlineTableDialog(p) {
   await run({ t: 'addInline', key: key(p), title: (r.data.title || '').trim() || '記録', headers: heads, rows: Math.min(rows, 100) }, { kind: '簡易表追加' });
   toast('簡易表を入れました');
 }
+/* ---------- そろえる：基準値の数値化・確認方法の言葉・機種の比較 ---------- */
+const MEAS = /トルク|締付|締め付け|締付け|隙間|スキマ|すきま|寸法|高さ|幅|距離|長さ|公差|レベル|真直|直角|平行|振れ|テンション|(?<!引っ|引)張り(は|が|を|具合)|圧力|エア圧|出代|ガタ|段差|芯出|クリアランス|角度|偏り/;
+const VAGUE_STD = /^(確認|確認済|OK|ＯＫ|SA工程|ＳＡ工程|済|-|－|ー)?$/;
+function stdNeed(t) {
+  const it = t.item.normalize('NFKC'), sd = t.std.normalize('NFKC').trim();
+  const hasNum = /\d/.test(sd);
+  if (/重要工程/.test(sd)) return null;
+  if (MEAS.test(it) && !hasNum) return { lv: 'hi', why: '測定・締付の確認なのに数値がない' };
+  if (/適正|適当|大体|だいたい|規定の?(トルク|値)?で|しっかり/.test(it + '\n' + sd) && !hasNum) return { lv: 'hi', why: '「適正」「規定」など、数値がない' };
+  if (!sd) return { lv: 'md', why: '基準値・測定具が空欄' };
+  if (sd.split('\n').every(l => VAGUE_STD.test(l.trim()))) return { lv: 'md', why: `「${sd.replace(/\n/g, ' ')}」だけで、確認方法がわからない` };
+  return null;
+}
+function openTidy(tab) { S.tidy = { tab: tab || (S.tidy && S.tidy.tab) || 'num', open: null, edits: {}, cmp: null, filter: 'all' }; S.view = 'tidy'; render(); scrollTo(0, 0); }
+function renderTidy() {
+  setHeader(); $('#ttl').textContent = 'そろえる';
+  const T = S.tidy; const tab = (v, l) => `<button data-tt="${v}" aria-pressed="${T.tab === v}">${l}</button>`;
+  $('#main').innerHTML = `<div class="tabs">${tab('num', '数値化')}${tab('word', '言葉そろえ')}${tab('cmp', '機種比較')}</div><div id="tdBody"></div>`;
+  for (const b of document.querySelectorAll('[data-tt]')) b.onclick = () => { T.tab = b.dataset.tt; T.cmp = null; renderTidy(); scrollTo(0, 0); };
+  if (T.tab === 'word') renderWord(); else if (T.tab === 'cmp') renderCmp(); else renderNum();
+}
+
+/* ---- 1. 基準値の数値化 ---- */
+function renderNum() {
+  const T = S.tidy; const tg = aiTargets('all'); const by = byKey(tg);
+  let need = 0, hi = 0; const pages = [];
+  for (const [k, ts] of by) { const ns = ts.map(t => ({ t, n: stdNeed(t) })).filter(x => x.n); need += ns.length; hi += ns.filter(x => x.n.lv === 'hi').length; pages.push({ k, ts, ns }); }
+  const done = tg.length - need; const pct = tg.length ? Math.round(done / tg.length * 100) : 100;
+  const f = T.filter;
+  let h = `<p class="meta">数値や確認方法が足りない項目を、全ページから洗い出します。その場で基準値を書いて反映できます。月に1ページずつなど、少しずつ進めてください。</p>
+  <div class="box" style="padding:10px 12px"><div class="prog"><div style="width:${pct}%"></div></div><p style="margin:6px 0 0;font-size:15px">基準がそろっている項目 <b>${done}</b> / ${tg.length}（${pct}%）</p><p class="meta" style="margin:2px 0 0">残り：<b style="color:var(--hi-tx)">数値がない ${hi}件</b>・<b style="color:var(--md-tx)">方法がない／空欄 ${need - hi}件</b></p></div>
+  <div class="chips">${[['all', 'すべて'], ['hi', '数値がない'], ['md', '方法がない・空欄']].map(([v, l]) => `<button data-nf="${v}" aria-pressed="${f === v}">${l}</button>`).join('')}</div>`;
+  const list = pages.map(pg => ({ ...pg, ns: pg.ns.filter(x => f === 'all' || x.n.lv === f) })).filter(pg => pg.ns.length);
+  if (!list.length) h += '<p class="meta">この条件で残っている項目はありません。</p>';
+  for (const pg of list) {
+    const p = pageByKey(pg.k); const open = T.open === pg.k; const left = pg.ns.length; const all = pg.ts.length; const pp = Math.round((all - pageNeed(pg)) / all * 100);
+    h += `<details class="npage"${open ? ' open' : ''} data-np="${esc(pg.k)}"><summary><span class="t"><b>${esc(S.cb.title(p))}</b><small>${esc(label(p))}・残り ${left}件</small></span><span class="mini"><span style="width:${pp}%"></span></span></summary>`;
+    if (open) {
+      for (const { t, n } of pg.ns) {
+        const id = t.key + '#' + t.i; const v = T.edits[id] != null ? T.edits[id] : t.std; const sug = numSuggest(t);
+        h += `<div class="nrow ${n.lv}"><div class="h"><span class="badge ${n.lv}">${n.lv === 'hi' ? '数値なし' : '方法なし'}</span><span>No.${esc(t.no || '-')}</span><small class="meta">${esc(n.why)}</small></div><div class="it">${esc(t.item)}</div>
+        <label class="lbl" for="ne_${esc(id)}">基準値／測定具</label><textarea class="ne" id="ne_${esc(id)}" data-id="${esc(id)}" rows="2" placeholder="${esc(sug.ph)}">${esc(v)}</textarea>
+        ${sug.list.length ? `<div class="sugs">${sug.list.map(s => `<button type="button" class="sm" data-sg="${esc(id)}" data-v="${esc(s.v)}" title="${esc(s.from)}">${esc(short(s.v, 24))}<small>${esc(s.from)}</small></button>`).join('')}</div>` : ''}</div>`;
+      }
+      const cnt = pg.ns.filter(({ t }) => { const id = t.key + '#' + t.i; return T.edits[id] != null && T.edits[id] !== t.std; }).length;
+      h += `<div class="row2"><button class="pri" data-ns="${esc(pg.k)}">このページの入力を反映（${cnt}件）</button><button class="sm" data-no="${esc(pg.k)}">ページを開く</button></div>`;
+    }
+    h += '</details>';
+  }
+  $('#tdBody').innerHTML = h;
+  for (const b of document.querySelectorAll('[data-nf]')) b.onclick = () => { T.filter = b.dataset.nf; renderTidy(); };
+  for (const d of document.querySelectorAll('details.npage')) d.ontoggle = () => { if (d.open && T.open !== d.dataset.np) { T.open = d.dataset.np; const y = scrollY; renderTidy(); scrollTo(0, y); } else if (!d.open && T.open === d.dataset.np) T.open = null; };
+  const orig = new Map(tg.map(t => [t.key + '#' + t.i, t.std]));
+  for (const a of document.querySelectorAll('textarea.ne')) a.oninput = () => { T.edits[a.dataset.id] = a.value; const b = document.querySelector('[data-ns]'); if (b) { const n = [...document.querySelectorAll('textarea.ne')].filter(x => x.value !== orig.get(x.dataset.id)).length; b.textContent = `このページの入力を反映（${n}件）`; } };
+  for (const b of document.querySelectorAll('[data-sg]')) b.onclick = () => { const a = document.getElementById('ne_' + b.dataset.sg); const cur = a.value.trim(); const vague = cur.split('\n').every(l => VAGUE_STD.test(l.normalize('NFKC').trim())); a.value = cur && !vague && !b.dataset.v.startsWith(cur) ? cur + '\n' + b.dataset.v : b.dataset.v; a.dispatchEvent(new Event('input')); a.focus(); };
+  for (const b of document.querySelectorAll('[data-no]')) b.onclick = () => { S.backTo = 'tidy'; S.pageKey = b.dataset.no; S.view = 'page'; S.mode = 'items'; render(); scrollTo(0, 0); };
+  for (const b of document.querySelectorAll('[data-ns]')) b.onclick = async () => {
+    const k = b.dataset.ns; const ts = by.get(k) || [];
+    const edits = ts.map(t => ({ t, v: T.edits[t.key + '#' + t.i] })).filter(x => x.v != null && x.v !== x.t.std);
+    if (!edits.length) { toast('基準値を書き換えた項目がありません'); return; }
+    if (edits.some(x => x.v.includes('□'))) { toast('□ の部分を埋めてください'); return; }
+    for (const x of edits) delete T.edits[x.t.key + '#' + x.t.i];
+    await runBatch(edits.map(x => ({ key: x.t.key, i: x.t.i, d: { std: x.v }, kind: '変更', title: x.t.page, label: x.t.label })), []);
+    S.view = 'tidy'; renderTidy(); toast(edits.length + '件の基準値を反映しました');
+  };
+}
+function pageNeed(pg) { return pg.ts.filter(t => stdNeed(t)).length; }
+function numSuggest(t) {
+  const list = [];
+  if (S.ref) { const p = pageByKey(t.key); const rp = p && pairOf(p); if (rp) { const tk = key2(t.item); let best = null, bs = 0; for (const r of refItems(rp)) { const s = dice(tk, r.k); if (s > bs) { bs = s; best = r; } } if (best && bs >= 0.7 && best.std.trim() && key2(best.std) !== key2(t.std)) list.push({ v: best.std, from: S.ref.label + ' No.' + (best.no || '-') }); } }
+  const g = stdGuess(t.item); if (g && g !== BL) list.push({ v: g, from: '案' });
+  const it = t.item.normalize('NFKC');
+  if (/トルク|締/.test(it)) list.push({ v: 'トルクレンチ\nトルク値：□□N·m', from: '定型' });
+  if (/隙間|スキマ|すきま|段差/.test(it)) list.push({ v: 'すきまゲージ\n□□mm以内', from: '定型' });
+  if (/高さ|寸法|幅|距離|長さ|出代/.test(it)) list.push({ v: 'スケール\n□□mm±□□', from: '定型' });
+  const seen = new Set(); return { list: list.filter(x => !seen.has(x.v) && seen.add(x.v)).slice(0, 4), ph: '例：トルクレンチ　36N·m' };
+}
+
+/* ---- 2. 確認方法の言葉 ---- */
+const wordBase = s => s.normalize('NFKC').replace(/\s+/g, '').replace(/(にて|で)?(確認|参照|チェック)$/, '');
+function wordGroups(tg) {
+  const cnt = new Map();
+  for (const t of tg) for (const l of t.std.split('\n')) { const k = l.trim(); if (k) cnt.set(k, (cnt.get(k) || 0) + 1); }
+  const g = new Map(); for (const [k, v] of cnt) { const b = wordBase(k); if (!b || /^\d/.test(b)) continue; if (!g.has(b)) g.set(b, []); g.get(b).push({ w: k, n: v }); }
+  return [...g].filter(([, a]) => a.length > 1).map(([b, a]) => { a.sort((x, y) => y.n - x.n); const pref = a.find(x => !/[｡-ﾟ]/.test(x.w)) || a[0]; return { base: b, vars: a, total: a.reduce((s, x) => s + x.n, 0), def: pref.w }; }).sort((x, y) => y.total - x.total);
+}
+function renderWord() {
+  const T = S.tidy; const tg = aiTargets('all'); const G = wordGroups(tg); T.wpick = T.wpick || {};
+  const vague = tg.filter(t => t.std.trim() && t.std.split('\n').every(l => VAGUE_STD.test(l.normalize('NFKC').trim()))).length;
+  let h = `<p class="meta">基準値／測定具の欄で、同じ意味なのに書き方が違う言葉（「目視」と「目視確認」、「ｽｹｰﾙ」と「スケール」など）をまとめました。そろえたい言葉を選んで「そろえる」を押すと、全ページの該当する行をその言葉に直します（行の中身がその言葉だけのものが対象です）。</p>`;
+  if (vague) h += `<div class="res md" style="margin:8px 0"><div class="msg">「確認」「SA工程」だけの欄が ${vague} 件あります</div><div class="meta">何で確認するのかがわからない書き方です。「基準値の数値化」で1件ずつ直せます。</div><div class="acts"><button class="sm" id="toNum">基準値の数値化で直す</button></div></div>`;
+  if (!G.length) h += '<p class="meta">書き方の違う言葉は見つかりませんでした。</p>';
+  G.forEach((g, i) => {
+    const pick = T.wpick[g.base] || g.def; const n = g.vars.filter(x => x.w !== pick).reduce((s, x) => s + x.n, 0);
+    h += `<div class="wg"><div class="h"><b>${esc(g.vars.map(x => x.w).join('／'))}</b><small class="meta">${g.total}か所</small></div><div class="wopts">${g.vars.map(x => `<label class="wopt"><input type="radio" name="wg${i}" value="${esc(x.w)}"${x.w === pick ? ' checked' : ''} data-wb="${esc(g.base)}"><span>${esc(x.w)}<small>${x.n}か所</small></span></label>`).join('')}</div><div class="row2" style="margin:6px 0 0"><button class="sm" data-wa="${i}"${n ? '' : ' disabled'}>「${esc(pick)}」にそろえる（${n}か所を直す）</button></div></div>`;
+  });
+  if (G.length > 1) h += `<div class="stick"><button class="pri" id="wAll" style="width:100%">上の選び方で、全部まとめてそろえる</button></div>`;
+  $('#tdBody').innerHTML = h;
+  if ($('#toNum')) $('#toNum').onclick = () => { T.tab = 'num'; T.filter = 'md'; renderTidy(); };
+  for (const r of document.querySelectorAll('[data-wb]')) r.onchange = () => { T.wpick[r.dataset.wb] = r.value; renderTidy(); };
+  const applyGroups = async gs => {
+    const m = new Map(); let cnt = 0;
+    for (const t of tg) { const lines = t.std.split('\n'); let ch = false; const nl = lines.map(l => { const k = l.trim(); const g = gs.find(x => x.vars.some(v => v.w === k)); if (!g) return l; const pick = T.wpick[g.base] || g.def; if (k === pick) return l; ch = true; cnt++; return l.replace(k, pick); }); if (ch) m.set(t.key + '#' + t.i, { t, std: nl.join('\n') }); }
+    if (!m.size) { toast('直すところはありません'); return; }
+    if (!(await ask('言葉をそろえる', `${m.size}項目（${cnt}か所）の基準値／測定具を直します。改訂履歴には「文言修正」と記録されます。`, 'そろえる'))) return;
+    await runBatch([...m.values()].map(x => ({ key: x.t.key, i: x.t.i, d: { std: x.std }, kind: '文言修正', title: x.t.page, label: x.t.label })), []);
+    S.view = 'tidy'; renderTidy(); toast(`${cnt}か所をそろえました`);
+  };
+  for (const b of document.querySelectorAll('[data-wa]')) b.onclick = () => applyGroups([G[+b.dataset.wa]]);
+  if ($('#wAll')) $('#wAll').onclick = () => applyGroups(G);
+}
+
+/* ---- 3. 機種の比較 ---- */
+function cmpPage(p) {
+  const rp = pairOf(p); const mine = aiTargets('all').filter(t => t.key === key(p));
+  if (!rp) return { rp: null, rows: mine.map(t => ({ t, r: null, st: 'mine' })), only: [] };
+  const rs = refItems(rp).filter(r => r.k.length >= 3 && !/^図[\d①-⑳]*$/.test(r.k)); const used = new Set(); const rows = [];
+  for (const t of mine) {
+    const tk = key2(t.item); let bi = -1, bs = 0; rs.forEach((r, j) => { if (used.has(j)) return; const s = dice(tk, r.k); if (s > bs) { bs = s; bi = j; } });
+    if (bs >= 0.55) { used.add(bi); const r = rs[bi]; const sameI = key2(t.item) === r.k, sameS = key2(t.std) === key2(r.std); rows.push({ t, r, st: sameI && sameS ? 'same' : !sameS ? 'std' : 'item', sim: bs }); }
+    else rows.push({ t, r: null, st: 'mine' });
+  }
+  return { rp, rows, only: rs.filter((_, j) => !used.has(j)) };
+}
+function renderCmp() {
+  const T = S.tidy; const R0 = S.ref;
+  let h = `<div class="box" style="padding:10px 12px"><b style="font-size:15px">比べる相手</b>${R0 ? `<p class="meta" style="margin:4px 0 6px"><b style="color:var(--ink)">${esc(R0.label)}</b>（${esc(R0.name)}）</p>` : '<p class="meta" style="margin:4px 0 6px">別の機種のチェックシート（.xlsx）を選んでください。同じ名前のページ同士で、項目と基準値を並べて比べます。</p>'}<div class="row2" style="margin:0"><button class="sm" id="cRef">${R0 ? '別のファイルにする' : '比べるファイルを選ぶ'}</button>${R0 ? '<button class="sm" id="cCsv">比較表をCSVで書き出す</button>' : ''}</div><input type="file" id="refFile" accept=".xlsx,.xlsm" hidden></div>`;
+  if (R0 && T.cmp) h += cmpDetail(pageByKey(T.cmp));
+  else if (R0) {
+    const ps = aiPages('all'); let tot = { std: 0, item: 0, mine: 0, only: 0 };
+    const rows = ps.map(p => { const c = cmpPage(p); const n = { std: c.rows.filter(x => x.st === 'std').length, item: c.rows.filter(x => x.st === 'item').length, mine: c.rp ? c.rows.filter(x => x.st === 'mine').length : 0, only: c.only.length }; for (const k in n) tot[k] += n[k]; return { p, c, n }; });
+    h += `<div class="sum"><div class="hi">基準値の違い<b>${tot.std}</b></div><div class="md">文言の違い<b>${tot.item}</b></div><div class="lo">${esc(R0.label)}だけ<b>${tot.only}</b></div><div class="ed">こちらだけ<b>${tot.mine}</b></div></div><div class="list">`;
+    h += rows.map(({ p, c, n }) => `<button class="row" data-cp="${esc(key(p))}"><span class="no">${esc(S.cb.pageNo(p) || '–')}</span><span class="t">${esc(S.cb.title(p))}<small>${c.rp ? '↔ ' + esc(R0.cb.title(c.rp)) : '相手のページなし'}</small></span><span class="cbad">${n.std ? `<span class="badge hi">基準${n.std}</span>` : ''}${n.item ? `<span class="badge md">文言${n.item}</span>` : ''}${n.only ? `<span class="badge lo">相手だけ${n.only}</span>` : ''}${c.rp && !n.std && !n.item && !n.only && !n.mine ? '<span class="badge ed">同じ</span>' : ''}</span></button>`).join('') + '</div>';
+  }
+  $('#tdBody').innerHTML = h;
+  $('#cRef').onclick = () => $('#refFile').click(); $('#refFile').onchange = e => e.target.files[0] && loadRef(e.target.files[0]);
+  if ($('#cCsv')) $('#cCsv').onclick = cmpCsv;
+  for (const b of document.querySelectorAll('[data-cp]')) b.onclick = () => { T.cmp = b.dataset.cp; renderTidy(); scrollTo(0, 0); };
+  bindCmpDetail();
+}
+function cmpDetail(p) {
+  const R0 = S.ref; const c = cmpPage(p); const lab = esc(R0.label);
+  let h = `<div class="row2"><button class="sm" id="cBack">‹ ページの一覧へ</button></div><h3 style="margin:8px 0">${esc(S.cb.title(p))}</h3>`;
+  h += `<label class="f" for="cSel">比べる${lab}のページ</label><select id="cSel" class="xsel"><option value="">（比べない）</option>${refPages().map(x => `<option value="${esc(refKey(x))}"${x === c.rp ? ' selected' : ''}>${esc(R0.cb.pageNo(x) || '')}　${esc(R0.cb.title(x))}</option>`).join('')}</select>`;
+  if (!c.rp) return h + '<p class="meta">比べるページを選んでください。</p>';
+  const ST = { same: ['ed', '同じ'], std: ['hi', '基準値が違う'], item: ['md', '文言が違う'], mine: ['lo', 'こちらだけ'] };
+  h += `<div class="chips">${['all', 'std', 'item', 'mine', 'only'].map(v => `<button data-cf="${v}" aria-pressed="${(S.tidy.cf || 'diff') === v || (v === 'all' && S.tidy.cf === 'all')}">${{ all: 'すべて', std: '基準値の違い', item: '文言の違い', mine: 'こちらだけ', only: lab + 'だけ' }[v]}</button>`).join('')}<button data-cf="diff" aria-pressed="${(S.tidy.cf || 'diff') === 'diff'}">違いだけ</button></div>`;
+  const cf = S.tidy.cf || 'diff';
+  c.rows.forEach((x, k) => {
+    if (cf === 'diff' && x.st === 'same') return; if (!['all', 'diff', x.st].includes(cf)) return;
+    const [cl, tx] = ST[x.st];
+    h += `<div class="cmp ${cl}"><div class="h"><span class="badge ${cl}">${tx}</span><span>No.${esc(x.t.no || '-')}${x.r ? ` ↔ ${lab} No.${esc(x.r.no || '-')}` : ''}</span></div><div class="cg"><div><small>こちら</small>${esc(x.t.item)}${x.t.std ? `<div class="cs">基準：${x.r ? diffHtml(x.r.std, x.t.std) : esc(x.t.std)}</div>` : '<div class="cs meta">基準：（空欄）</div>'}</div>${x.r ? `<div><small>${lab}</small>${x.st === 'item' || x.st === 'std' ? diffHtml(x.t.item, x.r.item) : esc(x.r.item)}${x.r.std ? `<div class="cs">基準：${esc(x.r.std)}</div>` : '<div class="cs meta">基準：（空欄）</div>'}</div>` : ''}</div>
+    ${x.r && (x.st === 'std' || x.st === 'item') ? `<div class="acts">${x.st === 'std' && x.r.std.trim() ? `<button class="sm" data-ad="${k}" data-f="std">基準値を${lab}に合わせる</button>` : ''}${key2(x.t.item) !== x.r.k ? `<button class="sm" data-ad="${k}" data-f="item">文言を${lab}に合わせる</button>` : ''}</div>` : ''}</div>`;
+  });
+  if (cf === 'all' || cf === 'diff' || cf === 'only') c.only.forEach((r, j) => { h += `<div class="cmp lo"><div class="h"><span class="badge lo">${lab}だけ</span><span>${lab} No.${esc(r.no || '-')}</span></div><div>${esc(r.item)}${r.std ? `<div class="cs">基準：${esc(r.std)}</div>` : ''}</div><div class="acts"><button class="sm" data-ao="${j}">このページの最後に追加</button></div></div>`; });
+  S._cmp = { p: key(p), c };
+  return h;
+}
+function bindCmpDetail() {
+  if (!$('#cBack')) return; const T = S.tidy; const { p: pk, c } = S._cmp;
+  $('#cBack').onclick = () => { T.cmp = null; renderTidy(); };
+  $('#cSel').onchange = e => { S.refPick = S.refPick || {}; S.refPick[pk] = e.target.value; renderTidy(); };
+  for (const b of document.querySelectorAll('[data-cf]')) b.onclick = () => { T.cf = b.dataset.cf; renderTidy(); };
+  for (const b of document.querySelectorAll('[data-ad]')) b.onclick = async () => {
+    const x = c.rows[+b.dataset.ad]; const f = b.dataset.f; const d = f === 'std' ? { std: x.r.std } : { item: x.r.item };
+    await runBatch([{ key: x.t.key, i: x.t.i, d, kind: '変更', title: x.t.page, label: x.t.label }], []); S.view = 'tidy'; renderTidy(); toast((f === 'std' ? '基準値' : '文言') + 'を合わせました');
+  };
+  for (const b of document.querySelectorAll('[data-ao]')) b.onclick = async () => {
+    const r = c.only[+b.dataset.ao]; const p = pageByKey(pk); if (!(await ask('項目を追加', `「${short(r.item, 50)}」を、このページの最後に追加します。`, '追加する'))) return;
+    const d = { item: r.item }; if (p.cols.std) d.std = r.std; await run({ t: 'add', key: pk, i: p.items.length - 1, d }, { kind: '追加' }); S.view = 'tidy'; renderTidy(); toast('追加しました');
+  };
+}
+async function cmpCsv() {
+  const R0 = S.ref; const q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+  const ST = { same: '同じ', std: '基準値が違う', item: '文言が違う', mine: 'こちらだけ' };
+  const L = [['こちらのページ', 'No', 'チェック項目', '基準値／測定具', '比べた結果', R0.label + 'のページ', R0.label + ' No', R0.label + ' チェック項目', R0.label + ' 基準値／測定具'].map(q).join(',')];
+  for (const p of aiPages('all')) {
+    const c = cmpPage(p); const rt = c.rp ? R0.cb.title(c.rp) : '';
+    for (const x of c.rows) L.push([S.cb.title(p), x.t.no, x.t.item, x.t.std, c.rp ? ST[x.st] : '相手のページなし', rt, x.r ? x.r.no : '', x.r ? x.r.item : '', x.r ? x.r.std : ''].map(q).join(','));
+    for (const r of c.only) L.push([S.cb.title(p), '', '', '', R0.label + 'だけ', rt, r.no, r.item, r.std].map(q).join(','));
+  }
+  const mine = ((libCur() || {}).name || S.fileName || 'チェックシート').replace(/[\\/:*?"<>|]/g, '_');
+  const blob = new Blob(['﻿' + L.join('\r\n')], { type: 'text/csv' });
+  await deliver(blob, `機種比較_${mine}_${R0.label}.csv`);
+}
 
 /* ---------- 保存 ---------- */
 const KIND = { '簡易表追加': '簡易表追加', '簡易表削除': '簡易表削除', '移動': 'チェック項目移動', 'ページ順番変更': 'ページ順番変更', '文言修正': '文言修正', '追加': 'チェック項目追加', '変更': 'チェック項目変更', '削除': 'チェック項目削除', 'ページ追加': 'ページ追加', 'ページ削除': 'ページ削除', 'ページ名変更': 'ページ名変更' };
@@ -2622,7 +2835,7 @@ async function deliver(blob, name) {
 }
 
 /* ---------- 起動 ---------- */
-$('#back').onclick = () => { if (S.view === 'order') { S.view = 'home'; render(); return; } if (S.view === 'page' && S.backTo === 'ai' && S.ai) { S.backTo = null; S.view = 'ai'; render(); return; } S.view = S.view === 'ai' && S.ai && S.ai.from ? 'page' : 'home'; if (S.view === 'page') S.pageKey = S.ai.from; render(); };
+$('#back').onclick = () => { if (S.view === 'order' || S.view === 'tidy') { if (S.view === 'tidy' && S.tidy && S.tidy.cmp) { S.tidy.cmp = null; renderTidy(); return; } S.view = 'home'; render(); return; } if (S.view === 'page' && S.backTo === 'tidy' && S.tidy) { S.backTo = null; S.view = 'tidy'; render(); return; } if (S.view === 'page' && S.backTo === 'ai' && S.ai) { S.backTo = null; S.view = 'ai'; render(); return; } S.view = S.view === 'ai' && S.ai && S.ai.from ? 'page' : 'home'; if (S.view === 'page') S.pageKey = S.ai.from; render(); };
 $('#undo').onclick = undo;
 $('#menuBtn').onclick = () => pageMenu();
 $('#saveBtn').onclick = save;
